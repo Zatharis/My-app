@@ -3,17 +3,19 @@ from tkinter import ttk
 from datetime import date
 import os
 from tkinter import font as tkfont
+import json
 
 class TaskManagerApp:
     def __init__(self, root):
         self.root = root
         self.root.title("My Task Manager")
         self.root.configure(bg="#ad7b93")
+        self.root.minsize(1100, 400)
 
         #Today's date
         self.today = date.today()
         self.date_string = self.today.strftime("%m-%d-%y")
-        self.task_file = "tasks.txt"
+        self.task_file = "tasks.json"
         self.custom_font = tkfont.Font(family="courier 10 pitch", size=16)
 
         self.style = ttk.Style()
@@ -28,8 +30,9 @@ class TaskManagerApp:
         self.root.columnconfigure(0, weight=1)
         self.root.rowconfigure(0, weight=1)
         self.mainframe.columnconfigure(0, weight=1)
-        self.mainframe.columnconfigure(1, weight=0)
+        self.mainframe.columnconfigure(1, weight=1)
         self.mainframe.columnconfigure(2, weight=1)
+        self.mainframe.rowconfigure(3, weight=1)
 
         #date label
         ttk.Label(self.mainframe, text=self.date_string, font=self.custom_font).grid(column=1, row=0, pady=5)
@@ -37,11 +40,11 @@ class TaskManagerApp:
         #Due Date Entry
         ttk.Label(self.mainframe, text="Due Date (MM-DD-YY):", font=self.custom_font).grid(column=0, row=1, pady=5, sticky=E)
         self.due_date_entry = Entry(self.mainframe, width=10, bg="#dddddd", bd=2, relief="solid", highlightbackground="#aaa", highlightthickness=1, font=self.custom_font)
-        self.due_date_entry.grid(column=0, row=2, pady=5, sticky=W)
+        self.due_date_entry.grid(column=0, row=2, pady=5, sticky="ew")
 
         #Task Entry
         self.entry_widget = Entry(self.mainframe, width=50, bg="#dddddd", bd=2, relief="solid", highlightbackground="#aaa", highlightthickness=1, font=self.custom_font)
-        self.entry_widget.grid(column=1, row=1, pady=5)
+        self.entry_widget.grid(column=1, row=1, pady=5, sticky="ew")
         self.entry_widget.bind("<Return>", lambda event: self.get_task())
 
         #submit button
@@ -50,7 +53,8 @@ class TaskManagerApp:
 
         #Task Listbox with scrollbar
         self.task_listbox = Listbox(self.mainframe, width=60, height=10, bg="#d5a6bd", bd=2, relief="solid", highlightbackground="#aaa", highlightthickness=1, font=self.custom_font)
-        self.task_listbox.grid(column=1, row=3, pady=10)
+        self.task_listbox.grid(column=1, row=3, pady=10, sticky="nsew")
+        
 
         self.scrollbar = Scrollbar(self.mainframe, orient=VERTICAL, command=self.task_listbox.yview)
         self.scrollbar.grid(column=2, row=3, sticky='ns', pady=10)
@@ -74,14 +78,41 @@ class TaskManagerApp:
             self.due_date_entry.delete(0, END)
 
     def save_task(self, task_text):
-        with open(self.task_file, "a") as f:
-            f.write(task_text + "\n")
+        if "] - " in task_text:
+            tag, rest = task_text.split("] - ", 1)
+            tag = tag.strip("[]")
+        else:
+            tag, rest = self.date_string, task_text
+
+        task_data = {
+            "date": tag,
+            "text": rest.strip()
+        }
+
+        tasks = []
+        if os.path.exists(self.task_file):
+            with open(self.task_file, "r") as f:
+                try:
+                    tasks = json.load(f)
+                except json.JSONDecodeError:
+                    pass
+
+
+        tasks.append(task_data)
+
+        with open(self.task_file, "w") as f:
+            json.dump(tasks, f, indent=4)
 
     def load_tasks(self):
         if os.path.exists(self.task_file):
             with open(self.task_file, "r") as f:
-                for line in f:
-                    self.task_listbox.insert(END, line.strip())
+                try:
+                    tasks = json.load(f)
+                    for task in tasks:
+                        task_text = f"[{task['date']}] - {task['text']}"
+                        self.task_listbox.insert(END, task_text)
+                except json.JSONDecodeError:
+                    pass
 
     def delete_task(self):
         selected_index = self.task_listbox.curselection()
@@ -92,12 +123,22 @@ class TaskManagerApp:
 
     def delete_task_from_file(self, task_text):
         if os.path.exists(self.task_file):
-            with open(self.task_file, "r") as f:
-                lines = f.readlines()
-            with open(self.task_file, "w") as f:
-                for line in lines:
-                    if line.strip() != task_text:
-                        f.write(line)
+            try:
+                with open(self.task_file, "r") as f:
+                    tasks = json.load(f)
+            except json.JSONDecodeError:
+                return
+
+        if "] - " in task_text:
+            tag, rest = task_text.split("] - ", 1)
+            tag = tag.strip("[]")
+        else:
+            tag, rest = self.date_string, task_text
+
+        tasks = [task for task in tasks if not (task['date'] == tag and task['text'] == rest.strip())]
+
+        with open(self.task_file, "w") as f:
+            json.dump(tasks, f, indent=4)
 
 
 if __name__ == "__main__":
