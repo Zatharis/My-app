@@ -249,6 +249,10 @@ class TaskManagerApp:
             index = selected_index[0]
             task_text = self.task_listbox.get(index)
 
+            if self.undo_info:
+                self.root.after_cancel(self.undo_info['timer'])
+                self.finalize_deletion()
+
             if " [R]" in task_text:
                 undo_text = f"Undo Deletion: {task_text}?"
                 self.task_listbox.delete(index)
@@ -272,11 +276,13 @@ class TaskManagerApp:
         line_text = self.task_listbox.get(index)
 
         if line_text.startswith("Undo Deletion:"):
-            answer = messagebox.askyesno("Undo Deletion", "Reststore Task?")
+            answer = messagebox.askyesno("Undo Deletion", "Restore Task?")
             if answer:
                 self.cancel_undo()
             else:
-                self.finalize_deletion()
+                if self.undo_info:
+                    self.root.after_cancel(self.undo_info['timer'])
+                    self.finalize_deletion()
 
     def cancel_undo(self):
         if self.undo_info:
@@ -291,20 +297,21 @@ class TaskManagerApp:
             self.undo_info = None
 
     def finalize_deletion(self):
-        if self.undo_info:
-            index = self.undo_info['index']
-            task_text = self.undo_info['task_text']
+        if not self.undo_info or self.undo_info.get('index') is None:
+            return
+
+
+        index = self.undo_info['index']
+        task_text = self.undo_info['task_text']
+
+        self.undo_info = None
                     
         try:
-            current_text = self.task_listbox.get(index)
-            if current_text.startswith("Undo Deletion:"):
-                self.task_listbox.delete(index)
+            self.task_listbox.delete(index)
         except TclError:
             pass
 
         self.delete_task_from_file(task_text)
-
-        self.undo_info = None
 
     def delete_task_from_file(self, task_text):
         if os.path.exists(self.task_file):
@@ -348,7 +355,7 @@ class TaskManagerApp:
             with open(self.complete_task_file, "w") as f:
                 json.dump(existing, f, indent=4)        #update the main task file
         with open(self.task_file, "w") as f:
-            json.dump(tasks, f, indent=4)
+            json.dump(remaining_tasks, f, indent=4)
 
     def load_dismissed_recurring(self):
         if os.path.exists(self.dismissed_recurring_file):
