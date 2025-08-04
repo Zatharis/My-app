@@ -6,6 +6,8 @@ import platform
 from tkinter import PhotoImage
 import os
 import json
+from tkinter import Menu
+from tkinter import ACTIVE
 
 from themes.color_manager import load_theme
 
@@ -63,13 +65,12 @@ class TaskKeeperApp:
         self.undo_info = None
         self.task_listbox.bind("<Button 1>", self.on_listbox_click)
 
-
     def create_menu(self):
         menubar = Menu(self.root)
 
         filemenu = Menu(menubar, tearoff=0)
         filemenu.add_command(label="Exit", command=self.root.quit)
-        menubar.add.cascade(label="File", menu=filemenu)
+        menubar.add_cascade(label="File", menu=filemenu)
 
         viewmenu = Menu(menubar, tearoff=0)
         viewmenu.add_command(label="Completed Tasks", command=self.show_completed_tasks)
@@ -200,8 +201,6 @@ class TaskKeeperApp:
         self.dismissed_recurring_today.append(dismissed_task)
         save_dismissed_recurring(self.dismissed_recurring_file, self.dismissed_recurring_today, self.date_string)
         self.task_listbox.delete(ACTIVE)
-
-
 
     def show_completed_tasks(self):
         window = Toplevel(self.root)

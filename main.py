@@ -3,18 +3,22 @@ from layout import TaskKeeperApp
 from logic.utils import resource_path
 import platform
 from tkinter import PhotoImage
+import os
+
+
+
+
 
 if __name__ == "__main__":
     root = Tk()
-    if platform.system() == "Windows":
-        root.iconbitmap(resource_path("assets/icon.ico"))
+
+    icon_path = resource_path("assets/icon.png")
+
+    if os.path.exists(icon_path):
+        icon_img = PhotoImage(file=icon_path)
+        root.iconphoto(False, icon_img)
     else:
-        try:
-            icon_img = PhotoImage(file=resource_path("icon32.png"))
-            root.iconphoto(False, icon_img)
-            root._icon_img = icon_img
-        except Exception as e:
-            print(f"Failed to set icon: {e}")
+        print("Icon not found at:", icon_path)
 
     app = TaskKeeperApp(root)
     root.mainloop()
