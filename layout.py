@@ -6,9 +6,13 @@ import platform
 from tkinter import PhotoImage
 import os
 import json
-from logic.task_data import (
-    load_completed_tasks,
-    clear_completed_tasks_file
+
+from themes.color_manager import load_theme
+
+from ui.ui_elements import (
+    create_entry, create_button,
+    create_dropdown, create_listbox,
+    create_scrollbar
 )
 
 from logic.utils import resource_path
@@ -16,15 +20,18 @@ from logic.task_data import(
     save_task, load_tasks,
     delete_task_from_file,
     load_dismissed_recurring,
-    save_dismissed_recurring
+    save_dismissed_recurring,
+    load_completed_tasks,
+    clear_completed_tasks_file
 )
-from ui.color_editor import open_color_editor
+from themes.color_manager import open_color_editor
 
 class TaskKeeperApp:
     def __init__(self, root):
         self.root = root
         self.root.title("Task Keeper")
-        self.root.configure(bg="#ad7b93")
+        self.theme = load_theme()
+        self.root.configure(bg=self.theme["bg_main"])
         self.root.minsize(1100, 400)
 
         documents_path = os.path.join(os.path.expanduser("~"), "Documents")
@@ -78,42 +85,40 @@ class TaskKeeperApp:
         self.main_frame = ttk.Frame (self.root, style="Mainframe.TFrame")
         self.main_frame.pack(fill=BOTH, expand=True, padx=10, pady=10)
 
-        self.task_entry = Entry(self.main_frame, font=self.custom_font, bg="#e5c3cc")
+        self.task_entry = create_entry(self.main_frame, font=self.custom_font, bg=self.theme["bg_entry"])
         self.task_entry.grid(row=0, column=0, padx=5, pady=5, sticky=W+E)
 
-        self.due_entry = Entry(self.main_frame, font=self.custom_font, bg="#e5c3cc")
+        self.due_entry = create_entry(self.main_frame, font=self.custom_font, bg=self.theme["bg_entry"])
         self.due_entry.grid(row=0, column=1, padx=5, pady=5, sticky=W+E)
 
         self.recurring_var = StringVar(value="No")
-        self.recurring_dropdown = ttk.Combobox(
-            self.main_frame, textvariable=self.recurring_var,
-            values=["No", "Yes"], state="readonly",
-            style="CustomCombobox.TCombobox"
+        self.recurring_dropdown = create_dropdown(
+            self.main_frame, self.recurring_var, ["No", "Yes"]
         )
 
         self.recurring_dropdown.grid(row=0, column=2, padx=5, pady=5)
 
-        self.submit_button = Button(self.main_frame, text="Submit", command=self.get_task, bg="#8a6276")
+        self.submit_button = create_button(self.main_frame, text="Submit", command=self.get_task, bg=self.theme["bg_button"], fg=self.theme["fg_button"])
         self.submit_button.grid(row=0, column=3, padx=5, pady=5)
 
-        self.delete_button = Button(self.main_frame, text="Delete", command=self.delete_task, bg="#8a6276")
+        self.delete_button = create_button(self.main_frame, text="Delete", command=self.delete_task, bg=self.theme["bg_button"], fg=self.theme["fg_button"])
         self.delete_button.grid(row=0, column=4, padx=5, pady=5)
 
-        self.undo_button = Button(self.main_frame, text="Undo", command=self.cancel_undo, bg="#8a6276")
+        self.undo_button = create_button(self.main_frame, text="Undo", command=self.cancel_undo, bg=self.theme["bg_button"], fg=self.theme["fg_button"])
         self.undo_button.grid(row=0, column=5, padx=5, pady=5)
 
-        self.task_listbox = Listbox(self.main_frame, font=self.custom_font, bg="#f5dfe8")
+        self.task_listbox = create_listbox(self.main_frame, font=self.custom_font, bg=self.theme["bg_listbox"])
         self.task_listbox.grid(row=1, column=0, columnspan=6, padx=5, pady=10, sticky=NSEW)
         self.main_frame.rowconfigure(1, weight=1)
         self.main_frame.columnconfigure(0, weight=1)
 
-        self.scrollbar = Scrollbar(self.main_frame)
+        self.scrollbar = create_scrollbar(self.main_frame)
         self.scrollbar.grid(row=1, column=6, sticky=N+S)
 
         self.task_listbox.config(yscrollcommand=self.scrollbar.set)
         self.scrollbar.config(command=self.task_listbox.yview)
 
-        self.dismiss_button = Button(self.main_frame, text="Dismiss Recurring", command=self.dismiss_recurring, bg="#8a6276", fg="white")
+        self.dismiss_button = create_button(self.main_frame, text="Dismiss Recurring", command=self.dismiss_recurring, fg=self.theme["fg_button"])
         self.dismiss_button.grid(row=0, column=6, padx=5, pady=5)
 
     def get_task(self):
@@ -201,16 +206,16 @@ class TaskKeeperApp:
     def show_completed_tasks(self):
         window = Toplevel(self.root)
         window.title("Completed Tasks")
-        window.configure(bg="#ad7d93")
+        window.configure(bg=self.theme["bg_main"])
 
-        listbox = Listbox(window, font=self.custom_font, bg="#f5dfe8")
+        listbox = Listbox(window, font=self.custom_font, bg=self.theme["bg_listbox"])
         listbox.pack(padx=10, pady=10, fill=BOTH, expand=True)
 
         completed = load_completed_tasks(self.complete_task_file)
         for task in completed:
             listbox.insert(END, task)
 
-        clear_button = Button(window, text="Clear Completed", command=lambda: self.clear_completed_tasks(listbox), bg="#8a6276", fg="white")
+        clear_button = create_button(window, text="Clear Completed", command=lambda: self.clear_completed_tasks(listbox), bg=self.theme["bg_button"], fg=self.theme["fg_button"])
         clear_button.pack(pady=5)
 
     def clear_completed_tasks(self, listbox_widget):
