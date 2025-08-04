@@ -6,13 +6,14 @@ from tkinter import font as tkfont
 import json
 from tkinter import messagebox
 import sys
+import platform
+from tkinter import PhotoImage
 
 def rescource_path(relative_path):
     try:
         base_path = sys._MEIPASS
     except AttributeError:
         base_path = os.path.abspath(".")
-    
     return os.path.join(base_path, relative_path)
 
 class TaskManagerApp:
@@ -415,7 +416,15 @@ class TaskManagerApp:
     def show_completed_tasks(self):
         top = Toplevel(self.root)
         top.title("Completed Tasks")
-        top.iconbitmap(rescource_path("icon.ico"))
+        if platform.system() == "Windows":
+            top.iconbitmap(rescource_path("icon32.ico"))
+        else:
+            try:
+                icon_img = PhotoImage(file=rescource_path("icon.32png"))
+                root.iconphoto(False, icon_img)
+                top._icon_img = icon_img
+            except Exception as e:
+                print(f"Failed to set completed tasks icon: {e}")
         top.configure(bg="#ad7b93")
         top.lift()
 
@@ -467,6 +476,15 @@ class TaskManagerApp:
 #Run
 if __name__ == "__main__":
     root = Tk()
-    root.iconbitmap(rescource_path("icon.ico"))
+    if platform.system() == "Windows":
+        root.iconbitmap(rescource_path("icon.ico"))
+    else:
+        try:
+            icon_img = PhotoImage(file=rescource_path("icon32.png"))
+            root.iconphoto(False, icon_img)
+            root._icon_img = icon_img
+        except Exception as e:
+            print(f"Failed to set icon: {e}")
+
     app = TaskManagerApp(root)
     root.mainloop()
