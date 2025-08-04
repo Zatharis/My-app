@@ -5,6 +5,15 @@ import os
 from tkinter import font as tkfont
 import json
 from tkinter import messagebox
+import sys
+
+def rescource_path(relative_path):
+    try:
+        base_path = sys._MEIPASS
+    except AttributeError:
+        base_path = os.path.abspath(".")
+    
+    return os.path.join(base_path, relative_path)
 
 class TaskManagerApp:
     def __init__(self, root):
@@ -180,31 +189,28 @@ class TaskManagerApp:
         recurring = bool(self.recurring_var.get()) and self.recurring_rate.get() != "Never"
 
         if user_input:
+            display_date = self.date_string
+            task_text = f"[{display_date}] - {user_input}"
             if due_date:
-                task_text = f"[{due_date}] - {user_input} (Due: {due_date})"
-            else:
-                task_text = f"[{self.date_string}] - {user_input}"
-
+                task_text += f" (Due: {due_date})"
             if recurring:
                 task_text += " [R]"
 
             self.task_listbox.insert(END, task_text)
-            self.save_task(task_text, recurring)
+            self.save_task(user_input, due_date=due_date, recurring=recurring)
+            
+            #OLD
+            #self.save_task(task_text, recurring)
 
             self.entry_widget.delete(0, END)
             self.due_date_entry.delete(0, END)
             self.recurring_var.set(0)
 
-    def save_task(self, task_text, recurring=False):
-        if "] - " in task_text:
-            tag, rest = task_text.split("] - ", 1)
-            tag = tag.strip("[]")
-        else:
-            tag, rest = self.date_string, task_text
-
+    def save_task(self, task_name, due_date=None, recurring=False):
         task_data = {
-            "date": tag,
-            "text": rest.replace(" [R]", "").split(" (Due")[0].strip(),
+            "date": self.date_string,
+            "text": task_name,
+            "due": due_date,
             "recurring": recurring
         }
 
@@ -229,7 +235,6 @@ class TaskManagerApp:
                 try:
                     tasks = json.load(f)
                     for task in tasks:
-                        task_text = f"[{task['date']}] - {task['text']}"
                         if task.get("recurring"):
                             if task['text'] in self.dismissed_recurring_today:
                                 continue
@@ -237,8 +242,16 @@ class TaskManagerApp:
                             if unique_id in self.displayed_recurring_today:
                                 continue
                             self.displayed_recurring_today.add(unique_id)
-                            repeat = task.get("repeat", "Daily")
-                            task_text = f"[{self.date_string}] - {task['text']} (Recurring) [R]"
+
+                            task_text = f"[{self.date_string}] - {task['text']}"
+                            if task.get("due"):
+                                task_text += f" (Due: {task['due']})"
+                            task_text += " [R]"
+                        else:
+                            task_text = f"[{task['date']}] - {task['text']}"
+                            if task.get("due"):
+                                task_text += f" (Due: {task['due']})"
+
                         self.task_listbox.insert(END, task_text)
                 except json.JSONDecodeError:
                     pass
@@ -402,6 +415,7 @@ class TaskManagerApp:
     def show_completed_tasks(self):
         top = Toplevel(self.root)
         top.title("Completed Tasks")
+        top.iconbitmap(rescource_path("icon.ico"))
         top.configure(bg="#ad7b93")
         top.lift()
 
@@ -453,5 +467,6 @@ class TaskManagerApp:
 #Run
 if __name__ == "__main__":
     root = Tk()
+    root.iconbitmap(rescource_path("icon.ico"))
     app = TaskManagerApp(root)
     root.mainloop()
