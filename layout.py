@@ -8,8 +8,10 @@ import os
 import json
 from tkinter import Menu
 from tkinter import ACTIVE
+from tkinter.simpledialog import askstring
+from logic.utils import  set_window_icon
 
-from themes.color_manager import load_theme
+from themes.color_manager import load_theme, load_themes, open_color_editor, save_theme
 
 from ui.ui_elements import (
     create_entry, create_button,
@@ -24,9 +26,9 @@ from logic.task_data import(
     load_dismissed_recurring,
     save_dismissed_recurring,
     load_completed_tasks,
-    clear_completed_tasks_file
+    clear_completed_tasks_file,
+    dismiss_recurring_task
 )
-from themes.color_manager import open_color_editor
 
 class TaskKeeperApp:
     def __init__(self, root):
@@ -35,6 +37,7 @@ class TaskKeeperApp:
         self.theme = load_theme()
         self.root.configure(bg=self.theme["bg_main"])
         self.root.minsize(1100, 400)
+        
 
         documents_path = os.path.join(os.path.expanduser("~"), "Documents")
         if not os.path.exists(documents_path):
@@ -47,7 +50,7 @@ class TaskKeeperApp:
         self.complete_task_file = os.path.join(documents_path, "completed_tasks.json")
         self.dismissed_recurring_file = os.path.join(documents_path, "dismissed_recurring.json")
 
-        self.dismissed_recurring_today = load_dismissed_recurring(self.dismissed_recurring_file, self.date_string)
+        self.dismissed_recurring_today = load_dismissed_recurring()
         self.displayed_recurring_today = set()
 
         self.custom_font = tkfont.Font(family="courier 10 pitch", size=16)
@@ -55,9 +58,12 @@ class TaskKeeperApp:
         self.style.configure("TFrame", background="#ad7b93")
         self.style.configure("TLabel", background="#ad7b93")
         self.style.configure("ColoredLabel.TLabel", foreground="white", background="#8a6276", font=self.custom_font)
-        self.style.configure("Mainframe.TFrame", background="#ad7b93")
+        self.style.configure("Mainframe.TFrame", background=self.theme["bg_main"])
         self.style.map('CustomCombobox.TCombobox', fieldbackground=[('readonly', '#b5889e')],
                        background=[('readonly', '#b5889e')], foreground=[('readonly', 'black')])
+        
+        self.recurring_var = StringVar(value="No")
+
         self.create_menu()
         self.create_widgets()
         self.load_tasks()
@@ -68,79 +74,122 @@ class TaskKeeperApp:
     def create_menu(self):
         menubar = Menu(self.root)
 
+        # --- File menu ---
         filemenu = Menu(menubar, tearoff=0)
         filemenu.add_command(label="Exit", command=self.root.quit)
         menubar.add_cascade(label="File", menu=filemenu)
 
+        # --- View menu ---
         viewmenu = Menu(menubar, tearoff=0)
         viewmenu.add_command(label="Completed Tasks", command=self.show_completed_tasks)
         menubar.add_cascade(label="View", menu=viewmenu)
 
+        # --- Themes menu (for picking themes only) ---
+        themesmenu = Menu(menubar, tearoff=0)
+        themes = load_themes()
+        for theme_name in themes.keys():
+            themesmenu.add_command(
+                label=theme_name,
+                command=lambda n=theme_name: self.select_theme(n)
+            )
+        menubar.add_cascade(label="Themes", menu=themesmenu)
+
+        # --- Developer menu (for saving and editing themes) ---
         devmenu = Menu(menubar, tearoff=0)
-        devmenu.add_command(label="Edit Colors", command=lambda: open_color_editor(self))
+        devmenu.add_command(label="Edit Custom", command=lambda: open_color_editor(self))
+        devmenu.add_command(label="Save Custom", command=lambda: self.save_custom_theme())
         menubar.add_cascade(label="Developer", menu=devmenu)
 
         self.root.config(menu=menubar)
 
+        # ...existing code...
+    
     def create_widgets(self):
-        self.main_frame = ttk.Frame (self.root, style="Mainframe.TFrame")
+        self.main_frame = ttk.Frame(self.root, style="Mainframe.TFrame")
         self.main_frame.pack(fill=BOTH, expand=True, padx=10, pady=10)
 
-        self.task_entry = create_entry(self.main_frame, font=self.custom_font, bg=self.theme["bg_entry"])
-        self.task_entry.grid(row=0, column=0, padx=5, pady=5, sticky=W+E)
+        # --- LEFT SIDE ---
+        # Date label
+        self.date_label = Label(self.main_frame, text=self.date_string, font=self.custom_font, bg=self.theme["bg_label"])
+        self.date_label.grid(row=0, column=0, padx=5, pady=5, sticky=W)
 
-        self.due_entry = create_entry(self.main_frame, font=self.custom_font, bg=self.theme["bg_entry"])
-        self.due_entry.grid(row=0, column=1, padx=5, pady=5, sticky=W+E)
+        # Due date group frame
+        self.due_date_frame = Frame(self.main_frame, bg=self.theme["bg_frame"], bd=2, relief=GROOVE)
+        self.due_date_frame.grid(row=1, column=0, padx=5, pady=5, sticky=W+E, columnspan=2)
+        self.due_label = Label(self.due_date_frame, text="Due Date (MM-DD-YY):", font=self.custom_font, bg=self.theme["bg_label"])
+        self.due_label.pack(side=LEFT, padx=5, pady=5)
+        self.due_entry = create_entry(self.due_date_frame, font=self.custom_font, bg=self.theme["bg_entry"])
+        self.due_entry.pack(side=LEFT, padx=5, pady=5, fill=X, expand=True)
 
-        self.recurring_var = StringVar(value="No")
-        self.recurring_dropdown = create_dropdown(
-            self.main_frame, self.recurring_var, ["No", "Yes"]
-        )
+        # Task group frame
+        self.task_frame = Frame(self.main_frame, bg=self.theme["bg_frame"], bd=2, relief=GROOVE)
+        self.task_frame.grid(row=3, column=0, padx=5, pady=5, sticky=W+E, columnspan=2)
+        self.task_label = Label(self.task_frame, text="Task:", font=self.custom_font, bg=self.theme["bg_label"])
+        self.task_label.pack(side=LEFT, padx=5, pady=5)
+        self.task_entry = create_entry(self.task_frame, font=self.custom_font, bg=self.theme["bg_entry"])
+        self.task_entry.pack(side=LEFT, padx=5, pady=5, fill=X, expand=True)
 
-        self.recurring_dropdown.grid(row=0, column=2, padx=5, pady=5)
+        # Recurring group frame
+        self.recurring_frame = Frame(self.main_frame, bg=self.theme["bg_frame"], bd=2, relief=GROOVE)
+        self.recurring_frame.grid(row=5, column=0, padx=5, pady=5, sticky=W)
+        self.recurring_check = Checkbutton(self.recurring_frame, text="Recurring Task", variable=self.recurring_var, onvalue="Yes", offvalue="No", font=self.custom_font, bg=self.theme["bg_label"])
+        self.recurring_check.pack(side=LEFT, padx=5, pady=5)
+        self.recurring_dropdown = create_dropdown(self.recurring_frame, self.recurring_var, ["No", "Daily", "Weekly", "Monthly"])
+        self.recurring_dropdown.pack(side=LEFT, padx=5, pady=5)
 
-        self.submit_button = create_button(self.main_frame, text="Submit", command=self.get_task, bg=self.theme["bg_button"], fg=self.theme["fg_button"])
-        self.submit_button.grid(row=0, column=3, padx=5, pady=5)
-
-        self.delete_button = create_button(self.main_frame, text="Delete", command=self.delete_task, bg=self.theme["bg_button"], fg=self.theme["fg_button"])
-        self.delete_button.grid(row=0, column=4, padx=5, pady=5)
-
-        self.undo_button = create_button(self.main_frame, text="Undo", command=self.cancel_undo, bg=self.theme["bg_button"], fg=self.theme["fg_button"])
-        self.undo_button.grid(row=0, column=5, padx=5, pady=5)
-
+        # --- RIGHT SIDE ---
         self.task_listbox = create_listbox(self.main_frame, font=self.custom_font, bg=self.theme["bg_listbox"])
-        self.task_listbox.grid(row=1, column=0, columnspan=6, padx=5, pady=10, sticky=NSEW)
-        self.main_frame.rowconfigure(1, weight=1)
-        self.main_frame.columnconfigure(0, weight=1)
-
+        self.task_listbox.grid(row=0, column=2, rowspan=6, padx=5, pady=10, sticky=NSEW)
         self.scrollbar = create_scrollbar(self.main_frame)
-        self.scrollbar.grid(row=1, column=6, sticky=N+S)
-
+        self.scrollbar.grid(row=0, column=3, rowspan=6, sticky=N+S)
         self.task_listbox.config(yscrollcommand=self.scrollbar.set)
         self.scrollbar.config(command=self.task_listbox.yview)
 
-        self.dismiss_button = create_button(self.main_frame, text="Dismiss Recurring", command=self.dismiss_recurring, fg=self.theme["fg_button"])
-        self.dismiss_button.grid(row=0, column=6, padx=5, pady=5)
+        # --- BOTTOM BUTTONS FRAME ---
+        self.button_frame = Frame(self.main_frame, bg=self.theme["bg_frame"], bd=2, relief=GROOVE)
+        self.button_frame.grid(row=99, column=0, columnspan=3, padx=5, pady=10, sticky="nsew")  # Use a high row number and columnspan to ensure it's at the bottom and stretches
+
+        self.main_frame.rowconfigure(99, weight=1)  # Make bottom row expand
+
+        self.submit_button = create_button(self.button_frame, text="Add task", command=self.get_task, bg=self.theme["bg_button"], fg=self.theme["fg_button"])
+        self.submit_button.pack(side=LEFT, padx=5, pady=5, fill=X, expand=True)
+
+        self.delete_button = create_button(self.button_frame, text="Mark as Done (Delete)", command=self.delete_task, bg=self.theme["bg_button"], fg=self.theme["fg_button"])
+        self.delete_button.pack(side=LEFT, padx=5, pady=5, fill=X, expand=True)
+
+        self.dismiss_button = create_button(self.button_frame, text="Dismiss Recurring", command=self.dismiss_recurring, bg=self.theme["bg_button"], fg=self.theme["fg_button"])
+        self.dismiss_button.pack(side=LEFT, padx=5, pady=5, fill=X, expand=True)
+
+        # Grid weights for resizing
+        self.main_frame.columnconfigure(0, weight=0)
+        self.main_frame.columnconfigure(1, weight=0)
+        self.main_frame.columnconfigure(2, weight=1)
+        self.main_frame.rowconfigure(7, weight=1)  # Make bottom row stretch
 
     def get_task(self):
         task_text = self.task_entry.get().strip()
         due_date = self.due_entry.get().strip()
-        recurring = self.recurring_var.get().lower() == "yes"
+        recurring_type = self.recurring_var.get()  # "No", "Daily", "Weekly", "Monthly"
+        recurring = recurring_type != "No"
 
         if not task_text:
             messagebox.showwarning("Input Error", "Please enter a task")
             return
-        
+
         task_data = {
             "text": task_text,
             "date": self.date_string,
             "due": due_date if due_date else None,
-            "recurring": recurring
+            "recurring": recurring,
+            "recurring_type": recurring_type
         }
 
-        if task_text in self.task_listbox.get(0, END):
-            messagebox.showinfo("Duplicate Task", "This task already exists.")
-            return
+        # Check for duplicates using just the task text
+        for i in range(self.task_listbox.size()):
+            display_text = self.task_listbox.get(i)
+            if task_text in display_text:
+                messagebox.showinfo("Duplicate Task", "This task already exists.")
+                return
 
         save_task(self.task_file, task_data)
         self.task_entry.delete(0, END)
@@ -160,18 +209,19 @@ class TaskKeeperApp:
         if not selected_index:
             messagebox.showwarning("No selection", "Please select a task to delete.")
             return
-        
-        selected_text = self.task_listbox.get(selected_index)
-        self.undo_info = {
-            "text": selected_text,
-            "date": self.date_string,
-            "due": None,
-            "recurring":False
-        }
-
-        delete_task_from_file(self.task_file, self.complete_task_file, selected_text, self.date_string)
+        display_text = self.task_listbox.get(selected_index)
+        task_text = self.extract_task_text(display_text)
+        delete_task_from_file(self.task_file, self.complete_task_file, task_text, self.date_string)
         self.task_listbox.delete(selected_index)
         
+    def extract_task_text(self, display_text):
+        # Assumes format: "[D] Task name (date)"
+        parts = display_text.split(" ", 1)
+        if len(parts) == 2:
+            text_and_date = parts[1]
+            task_text = text_and_date.rsplit(" (", 1)[0]
+            return task_text.strip()
+        return display_text.strip()
 
     def on_listbox_click(self, event):
         self.task_listbox.selection_clear(0, END)
@@ -196,16 +246,35 @@ class TaskKeeperApp:
     def finalize_deletion(self):
         self.undo_info = None
 
+    def get_recurring_type(self, task_text):
+        """
+        Returns the recurring type ("Daily", "Weekly", "Monthly", "No") for the given task text.
+        """
+        try:
+            with open(self.task_file, "r") as f:
+                tasks = json.load(f)
+            for task in tasks:
+                if task["text"] == task_text:
+                    return task.get("recurring_type", "No")
+        except Exception:
+            pass
+        return "No"
+
     def dismiss_recurring(self):
-        dismissed_task = self.task_listbox.get(ACTIVE)
-        self.dismissed_recurring_today.append(dismissed_task)
-        save_dismissed_recurring(self.dismissed_recurring_file, self.dismissed_recurring_today, self.date_string)
-        self.task_listbox.delete(ACTIVE)
+        selected_index = self.task_listbox.curselection()
+        if not selected_index:
+            messagebox.showwarning("No selection", "Please select a recurring task to dismiss.")
+            return
+        selected_text = self.task_listbox.get(selected_index)
+        recurring_type = self.get_recurring_type(selected_text)
+        dismiss_recurring_task(selected_text, recurring_type)
+        self.task_listbox.delete(selected_index)
 
     def show_completed_tasks(self):
         window = Toplevel(self.root)
         window.title("Completed Tasks")
         window.configure(bg=self.theme["bg_main"])
+        set_window_icon(window)
 
         listbox = Listbox(window, font=self.custom_font, bg=self.theme["bg_listbox"])
         listbox.pack(padx=10, pady=10, fill=BOTH, expand=True)
@@ -220,5 +289,58 @@ class TaskKeeperApp:
     def clear_completed_tasks(self, listbox_widget):
         clear_completed_tasks_file(self.complete_task_file)
         listbox_widget.delete(0, END)
+
+    def apply_theme(self):
+        self.root.configure(bg=self.theme["bg_main"])
+        self.style.configure("Mainframe.TFrame", background=self.theme["bg_main"])
+        self.main_frame.configure(style="Mainframe.TFrame")
+        self.due_date_frame.configure(bg=self.theme["bg_frame"])
+        self.task_frame.configure(bg=self.theme["bg_frame"])
+        self.recurring_frame.configure(bg=self.theme["bg_frame"])
+        self.button_frame.configure(bg=self.theme["bg_frame"])
+        self.date_label.configure(bg=self.theme["bg_label"])
+        self.due_label.configure(bg=self.theme["bg_label"])
+        self.due_entry.configure(bg=self.theme["bg_entry"])
+        self.task_label.configure(bg=self.theme["bg_label"])
+        self.task_entry.configure(bg=self.theme["bg_entry"])
+        self.recurring_check.configure(bg=self.theme["bg_label"])
+        self.recurring_dropdown.configure(background=self.theme["bg_entry"])
+        self.task_listbox.configure(bg=self.theme["bg_listbox"])
+        self.submit_button.configure(bg=self.theme["bg_button"], fg=self.theme["fg_button"])
+        self.delete_button.configure(bg=self.theme["bg_button"], fg=self.theme["fg_button"])
+        self.dismiss_button.configure(bg=self.theme["bg_button"], fg=self.theme["fg_button"])
+
+    def select_theme(self, theme_name):
+        self.theme = load_theme(theme_name)
+        self.apply_theme()
+
+    def save_custom_theme(self):
+        window = Toplevel(self.root)
+        window.title("Save Custom Theme")
+        set_window_icon(window)
+        window.configure(bg=self.theme["bg_main"])
+        window.resizable(False, False)
+
+        label = Label(window, text="Enter a name for your custom theme:", font=self.custom_font, bg=self.theme["bg_main"], fg=self.theme["fg_button"])
+        label.pack(padx=20, pady=(20, 5))
+
+        entry = Entry(window, font=self.custom_font)
+        entry.pack(padx=20, pady=5)
+        entry.focus_set()
+
+        def save_and_close():
+            theme_name = entry.get().strip()
+            if theme_name:
+                save_theme(theme_name, self.theme)
+                messagebox.showinfo("Theme Saved", f"Theme '{theme_name}' saved.", parent=window)
+                window.destroy()
+            else:
+                messagebox.showwarning("Input Error", "Please enter a theme name.", parent=window)
+
+        save_btn = Button(window, text="Save", command=save_and_close, font=self.custom_font, bg=self.theme["bg_button"], fg=self.theme["fg_button"])
+        save_btn.pack(pady=(10, 20))
+
+        window.grab_set()
+        window.wait_window()
 
 
