@@ -29,7 +29,7 @@ def load_tasks(task_file, listbox, date_string, dismissed_recurring_today, displ
             continue
 
         task_str = task["text"]
-        if task["due"]:
+        if task.get("due"):
             task_str += f" (Due: {task['due']})"
         listbox.insert("end", task_str)
 
