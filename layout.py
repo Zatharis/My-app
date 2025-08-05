@@ -1,55 +1,36 @@
 from tkinter import *
 from tkinter import ttk, messagebox
-from datetime import date
-from tkinter import font as tkfont
-import platform
-from tkinter import PhotoImage
-import os
-import json
-from tkinter import Menu
-from tkinter import ACTIVE
-from tkinter.simpledialog import askstring
-from logic.utils import  set_window_icon
-
-from themes.color_manager import save_last_theme, load_last_theme, open_color_editor
-from themes.color_manager import load_theme, load_themes
-
-from ui.ui_elements import (
-    create_entry, create_button,
-    create_dropdown, create_listbox,
-    create_scrollbar
-)
-
-from logic.utils import resource_path
-from logic.task_data import(
-    save_task, load_tasks,
+from themes.color_manager import load_themes, load_theme, save_last_theme, load_last_theme
+from logic.task_data import (
+    save_task,
     delete_task_from_file,
-    load_dismissed_recurring,
-    save_dismissed_recurring,
     load_completed_tasks,
     clear_completed_tasks_file,
-    dismiss_recurring_task
+    dismiss_recurring_task,
+    should_show_recurring,
+    get_display_text,
 )
+from logic.utils import set_window_icon
+from ui.ui_elements import create_entry, create_button, create_listbox, create_scrollbar, create_dropdown
+import os
+from datetime import date
 
 class TaskKeeperApp:
     def __init__(self, root):
         self.root = root
+        set_window_icon(self.root)
         self.style = ttk.Style(self.root)
         last_theme = load_last_theme()
         self.theme = load_theme(last_theme)
         self.date_string = date.today().strftime("%Y-%m-%d")
-        self.custom_font = tkfont.Font(family="Arial", size=12)
+        self.custom_font = ("Arial", 12)
         self.recurring_var = StringVar(value="No")
         self.task_file = os.path.join(os.path.expanduser("~"), "Documents", "tasks.json")
         self.complete_task_file = os.path.join(os.path.expanduser("~"), "Documents", "completed_tasks.json")
-        self.displayed_recurring_today = set()
-        self.dismissed_recurring_today = load_dismissed_recurring()
         self.create_menu()
         self.create_widgets()
         self.apply_theme()
         self.load_tasks()
-        self.undo_info = None
-        self.task_listbox.bind("<Button 1>", self.on_listbox_click)
 
     def create_menu(self):
         menubar = Menu(self.root)
@@ -171,19 +152,21 @@ class TaskKeeperApp:
                 messagebox.showinfo("Duplicate Task", "This task already exists.")
                 return
 
-        save_task(self.task_file, task_data)
+        self.save_task(self.task_file, task_data)
         self.task_entry.delete(0, END)
         self.due_entry.delete(0, END)
         self.recurring_var.set("No")
 
         self.task_listbox.delete(0, END)
-        self.displayed_recurring_today.clear()
         self.load_tasks()
 
     def load_tasks(self):
-        load_tasks(self.task_file, self.task_listbox, self.date_string,
-                   self.dismissed_recurring_today, self.displayed_recurring_today)
-        
+        self.task_listbox.delete(0, END)
+        dismissed_today = set()  # Load from file if needed
+        displayed_today = set()  # Track displayed recurring tasks if needed
+        from logic.task_data import load_tasks
+        load_tasks(self.task_file, self.task_listbox, self.date_string, dismissed_today, displayed_today)
+
     def delete_task(self):
         selected_index = self.task_listbox.curselection()
         if not selected_index:
@@ -193,55 +176,6 @@ class TaskKeeperApp:
         task_text = self.extract_task_text(display_text)
         delete_task_from_file(self.task_file, self.complete_task_file, task_text, self.date_string)
         self.task_listbox.delete(selected_index)
-
-    def extract_task_text(self, display_text):
-        # Handles format: "[D] Task name (date) | Due: ..."
-        if display_text.startswith("["):
-            parts = display_text.split(" ", 1)
-            if len(parts) == 2:
-                text_and_date = parts[1]
-                # Remove due date if present
-                text_and_date = text_and_date.split(" | Due:")[0]
-                task_text = text_and_date.rsplit(" (", 1)[0]
-                return task_text.strip()
-        # Handles format: "Task name (date) | Due: ..."
-        text_and_date = display_text.split(" | Due:")[0]
-        return text_and_date.rsplit(" (", 1)[0].strip()
-
-    def on_listbox_click(self, event):
-        self.task_listbox.selection_clear(0, END)
-
-    def cancel_undo(self):
-        if self.undo_info:
-            try:
-                with open(self.task_file, "r") as f:
-                    tasks = json.load(f)
-            except (json.JSONDecodeError, FileNotFoundError):
-                tasks = []  
-
-            tasks.append(self.undo_info)
-            with open(self.task_file, "w") as f:
-                json.dump(tasks, f, indent=2)
-                
-            self.undo_info = None
-            self.task_listbox.delete(0, END)
-            self.dismissed_recurring_today.clear()
-            self.load_tasks()
-
-    def finalize_deletion(self):
-        self.undo_info = None
-
-    def get_recurring_type(self, display_text):
-        task_text = self.extract_task_text(display_text)
-        try:
-            with open(self.task_file, "r") as f:
-                tasks = json.load(f)
-            for task in tasks:
-                if task["text"] == task_text:
-                    return task.get("recurring_type", "No")
-        except Exception:
-            pass
-        return "No"
 
     def dismiss_recurring(self):
         selected_index = self.task_listbox.curselection()
@@ -254,25 +188,29 @@ class TaskKeeperApp:
         dismiss_recurring_task(task_text, recurring_type)
         self.task_listbox.delete(selected_index)
 
-    def show_completed_tasks(self):
-        window = Toplevel(self.root)
-        window.title("Completed Tasks")
-        window.configure(bg=self.theme["bg_main"])
-        set_window_icon(window)
+    def extract_task_text(self, display_text):
+        # Handles format: "[D] Task name (date) | Due: ..."
+        if display_text.startswith("["):
+            parts = display_text.split(" ", 1)
+            if len(parts) == 2:
+                text_and_date = parts[1]
+                text_and_date = text_and_date.split(" | Due:")[0]
+                task_text = text_and_date.rsplit(" (", 1)[0]
+                return task_text.strip()
+        text_and_date = display_text.split(" | Due:")[0]
+        return text_and_date.rsplit(" (", 1)[0].strip()
 
-        listbox = Listbox(window, font=self.custom_font, bg=self.theme["bg_listbox"])
-        listbox.pack(padx=10, pady=10, fill=BOTH, expand=True)
-
-        completed = load_completed_tasks(self.complete_task_file)
-        for task in completed:
-            listbox.insert(END, task)
-
-        clear_button = create_button(window, text="Clear Completed", command=lambda: self.clear_completed_tasks(listbox), bg=self.theme["bg_button"], fg=self.theme["fg_button"])
-        clear_button.pack(pady=5)
-
-    def clear_completed_tasks(self, listbox_widget):
-        clear_completed_tasks_file(self.complete_task_file)
-        listbox_widget.delete(0, END)
+    def get_recurring_type(self, display_text):
+        task_text = self.extract_task_text(display_text)
+        try:
+            with open(self.task_file, "r") as f:
+                tasks = json.load(f)
+            for task in tasks:
+                if task["text"] == task_text:
+                    return task.get("recurring_type", "No")
+        except Exception:
+            pass
+        return "No"
 
     def apply_theme(self):
         self.root.configure(bg=self.theme.get("bg_main", "#ad7b93"))
@@ -290,7 +228,6 @@ class TaskKeeperApp:
         self.recurring_check.configure(bg=self.theme.get("bg_label", "#8a6276"), fg=self.theme.get("fg_text", "black"))
         self.recurring_dropdown.configure(background=self.theme.get("bg_entry", "#e5c3cc"), foreground=self.theme.get("fg_text", "black"))
         self.task_listbox.configure(bg=self.theme.get("bg_listbox", "#f5dfe8"), fg=self.theme.get("fg_text", "black"))
-        self.submit_button.configure(bg=self.theme.get("bg_button", "#8a6276"), fg=self.theme.get("fg_button", "white"))
         self.delete_button.configure(bg=self.theme.get("bg_button", "#8a6276"), fg=self.theme.get("fg_button", "white"))
         self.dismiss_button.configure(bg=self.theme.get("bg_button", "#8a6276"), fg=self.theme.get("fg_button", "white"))
 
@@ -298,6 +235,26 @@ class TaskKeeperApp:
         self.theme = load_theme(theme_name)
         self.apply_theme()
         save_last_theme(theme_name)
+
+    def show_completed_tasks(self):
+        window = Toplevel(self.root)
+        window.title("Completed Tasks")
+        window.configure(bg=self.theme["bg_main"])
+        set_window_icon(window)
+
+        listbox = Listbox(window, font=self.custom_font, bg=self.theme["bg_listbox"])
+        listbox.pack(padx=10, pady=10, fill=BOTH, expand=True)
+
+        completed = self.load_completed_tasks(self.complete_task_file)
+        for task in completed:
+            listbox.insert(END, task)
+
+        clear_button = create_button(window, text="Clear Completed", command=lambda: self.clear_completed_tasks(listbox), bg=self.theme["bg_button"], fg=self.theme["fg_button"])
+        clear_button.pack(pady=5)
+
+    def clear_completed_tasks(self, listbox_widget):
+        self.clear_completed_tasks_file(self.complete_task_file)
+        listbox_widget.delete(0, END)
 
     def save_custom_theme(self):
         window = Toplevel(self.root)
@@ -316,7 +273,7 @@ class TaskKeeperApp:
         def save_and_close():
             theme_name = entry.get().strip()
             if theme_name:
-                save_theme(theme_name, self.theme)
+                self.save_theme(theme_name, self.theme)
                 messagebox.showinfo("Theme Saved", f"Theme '{theme_name}' saved.", parent=window)
                 window.destroy()
             else:

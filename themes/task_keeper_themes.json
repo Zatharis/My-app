@@ -1,0 +1,62 @@
+{
+  "Default": {
+    "bg_main": "#ad7b93",
+    "bg_entry": "#e5c3cc",
+    "bg_button": "#8a6276",
+    "fg_button": "black",
+    "bg_listbox": "#f5dfe8",
+    "bg_frame": "#aaaaaa",
+    "bg_label": "#8a6276",
+    "fg_text": "black"
+  },
+  "Tidal Sunset": {
+    "bg_main": "#C67148",
+    "bg_entry": "#D9C68E",
+    "bg_button": "#2F4858",
+    "fg_button": "#FF4766",
+    "bg_listbox": "#D9C68E",
+    "bg_frame": "#a7cab1",
+    "bg_label": "#2F4858",
+    "fg_text": "#FF4766"
+  },
+  "Eggplant": {
+    "bg_main": "#310A31",
+    "bg_entry": "#f4ecd6",
+    "bg_button": "#8a6276",
+    "fg_button": "#5C996E",
+    "bg_listbox": "#f4ecd6",
+    "bg_frame": "#a7cab1",
+    "bg_label": "#8a6276",
+    "fg_text": "#5C996E"
+  },
+  "Fairy": {
+    "bg_main": "#C490D1",
+    "bg_entry": "#E5FCFF",
+    "bg_button": "#CF4F84",
+    "fg_button": "#364855",
+    "bg_listbox": "#E5FCFF",
+    "bg_frame": "#ACACDE",
+    "bg_label": "#CF4F84",
+    "fg_text": "#364855"
+  },
+  "Dark Theme": {
+    "bg_main": "#575757",
+    "bg_entry": "#666666",
+    "bg_button": "#7A7A7A",
+    "fg_button": "black",
+    "bg_listbox": "#666666",
+    "bg_frame": "#383838",
+    "bg_label": "#7A7A7A",
+    "fg_text": "black"
+  },
+  "Kibi": {
+    "bg_main": "#B592A0",
+    "bg_entry": "#8B1E3F",
+    "bg_button": "#3D5467",
+    "fg_button": "#89BD9E",
+    "bg_listbox": "#8B1E3F",
+    "bg_frame": "#A3C4BC",
+    "bg_label": "#3D5467",
+    "fg_text": "#89BD9E"
+  }
+}
