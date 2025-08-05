@@ -29,7 +29,8 @@ def get_recurring_indicator(recurring_type):
 
 def get_display_text(task):
     indicator = get_recurring_indicator(task.get("recurring_type", "No"))
-    return f"{indicator} {task['text']} ({task['date']})"
+    due = f" | Due: {task['due']}" if task.get("due") else ""
+    return f"{indicator} {task['text']} ({task['date']}){due}"
 
 def load_tasks(task_file, listbox, date_string, dismissed_today, displayed_today):
     try:
@@ -39,37 +40,45 @@ def load_tasks(task_file, listbox, date_string, dismissed_today, displayed_today
         tasks = []
 
     for task in tasks:
-        recurring_type = task.get("recurring_type", "No")
         display_text = get_display_text(task)
+        recurring_type = task.get("recurring_type", "No")
         if recurring_type in ["Daily", "Weekly", "Monthly"]:
             if should_show_recurring(task["text"], recurring_type):
                 listbox.insert("end", display_text)
         else:
             listbox.insert("end", display_text)
 
-def delete_task_from_file(task_file, completed_file, text, date_string):
+def delete_task_from_file(task_file, complete_task_file, task_text, date_string):
+    import json
     try:
         with open(task_file, "r") as f:
             tasks = json.load(f)
     except (FileNotFoundError, json.JSONDecodeError):
         tasks = []
 
-    new_tasks = [t for t in tasks if t["text"] != text or (t.get("recurring", False) and t["date"] != date_string)]
-    deleted = [t for t in tasks if t["text"] == text]
-
-    if deleted:
-        try:
-            with open(completed_file, "r") as f:
-                completed = json.load(f)
-        except (FileNotFoundError, json.JSONDecodeError):
-            completed = []
-
-        completed.append(text)
-        with open(completed_file, "w") as f:
-            json.dump(completed, f, indent=2)
+    # Find and remove the matching task (including recurring ones)
+    new_tasks = []
+    deleted_task = None
+    for task in tasks:
+        if task["text"] == task_text:
+            deleted_task = task
+            continue
+        new_tasks.append(task)
 
     with open(task_file, "w") as f:
         json.dump(new_tasks, f, indent=2)
+
+    # Optionally, add to completed file
+    if deleted_task:
+        try:
+            with open(complete_task_file, "r") as f:
+                completed = json.load(f)
+        except (FileNotFoundError, json.JSONDecodeError):
+            completed = []
+        due = f" | Due: {deleted_task.get('due')}" if deleted_task.get("due") else ""
+        completed.append(f'{deleted_task.get("text")} ({deleted_task.get("date")}){due}')
+        with open(complete_task_file, "w") as f:
+            json.dump(completed, f, indent=2)
 
 def load_completed_tasks(file_path):
     try:

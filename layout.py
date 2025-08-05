@@ -11,7 +11,8 @@ from tkinter import ACTIVE
 from tkinter.simpledialog import askstring
 from logic.utils import  set_window_icon
 
-from themes.color_manager import load_theme, load_themes, open_color_editor, save_theme
+from themes.color_manager import save_last_theme, load_last_theme, open_color_editor
+from themes.color_manager import load_theme, load_themes
 
 from ui.ui_elements import (
     create_entry, create_button,
@@ -33,41 +34,20 @@ from logic.task_data import(
 class TaskKeeperApp:
     def __init__(self, root):
         self.root = root
-        self.root.title("Task Keeper")
-        self.theme = load_theme()
-        self.root.configure(bg=self.theme["bg_main"])
-        self.root.minsize(1100, 400)
-        
-
-        documents_path = os.path.join(os.path.expanduser("~"), "Documents")
-        if not os.path.exists(documents_path):
-            os.makedirs(documents_path)
-
-        self.today = date.today()
-        self.date_string = self.today.strftime("%m-%d-%Y")
-
-        self.task_file = os.path.join(documents_path, "tasks.json")
-        self.complete_task_file = os.path.join(documents_path, "completed_tasks.json")
-        self.dismissed_recurring_file = os.path.join(documents_path, "dismissed_recurring.json")
-
-        self.dismissed_recurring_today = load_dismissed_recurring()
-        self.displayed_recurring_today = set()
-
-        self.custom_font = tkfont.Font(family="courier 10 pitch", size=16)
-        self.style = ttk.Style()
-        self.style.configure("TFrame", background="#ad7b93")
-        self.style.configure("TLabel", background="#ad7b93")
-        self.style.configure("ColoredLabel.TLabel", foreground="white", background="#8a6276", font=self.custom_font)
-        self.style.configure("Mainframe.TFrame", background=self.theme["bg_main"])
-        self.style.map('CustomCombobox.TCombobox', fieldbackground=[('readonly', '#b5889e')],
-                       background=[('readonly', '#b5889e')], foreground=[('readonly', 'black')])
-        
+        self.style = ttk.Style(self.root)
+        last_theme = load_last_theme()
+        self.theme = load_theme(last_theme)
+        self.date_string = date.today().strftime("%Y-%m-%d")
+        self.custom_font = tkfont.Font(family="Arial", size=12)
         self.recurring_var = StringVar(value="No")
-
+        self.task_file = os.path.join(os.path.expanduser("~"), "Documents", "tasks.json")
+        self.complete_task_file = os.path.join(os.path.expanduser("~"), "Documents", "completed_tasks.json")
+        self.displayed_recurring_today = set()
+        self.dismissed_recurring_today = load_dismissed_recurring()
         self.create_menu()
         self.create_widgets()
+        self.apply_theme()
         self.load_tasks()
-
         self.undo_info = None
         self.task_listbox.bind("<Button 1>", self.on_listbox_click)
 
@@ -213,15 +193,20 @@ class TaskKeeperApp:
         task_text = self.extract_task_text(display_text)
         delete_task_from_file(self.task_file, self.complete_task_file, task_text, self.date_string)
         self.task_listbox.delete(selected_index)
-        
+
     def extract_task_text(self, display_text):
-        # Assumes format: "[D] Task name (date)"
-        parts = display_text.split(" ", 1)
-        if len(parts) == 2:
-            text_and_date = parts[1]
-            task_text = text_and_date.rsplit(" (", 1)[0]
-            return task_text.strip()
-        return display_text.strip()
+        # Handles format: "[D] Task name (date) | Due: ..."
+        if display_text.startswith("["):
+            parts = display_text.split(" ", 1)
+            if len(parts) == 2:
+                text_and_date = parts[1]
+                # Remove due date if present
+                text_and_date = text_and_date.split(" | Due:")[0]
+                task_text = text_and_date.rsplit(" (", 1)[0]
+                return task_text.strip()
+        # Handles format: "Task name (date) | Due: ..."
+        text_and_date = display_text.split(" | Due:")[0]
+        return text_and_date.rsplit(" (", 1)[0].strip()
 
     def on_listbox_click(self, event):
         self.task_listbox.selection_clear(0, END)
@@ -246,10 +231,8 @@ class TaskKeeperApp:
     def finalize_deletion(self):
         self.undo_info = None
 
-    def get_recurring_type(self, task_text):
-        """
-        Returns the recurring type ("Daily", "Weekly", "Monthly", "No") for the given task text.
-        """
+    def get_recurring_type(self, display_text):
+        task_text = self.extract_task_text(display_text)
         try:
             with open(self.task_file, "r") as f:
                 tasks = json.load(f)
@@ -265,9 +248,10 @@ class TaskKeeperApp:
         if not selected_index:
             messagebox.showwarning("No selection", "Please select a recurring task to dismiss.")
             return
-        selected_text = self.task_listbox.get(selected_index)
-        recurring_type = self.get_recurring_type(selected_text)
-        dismiss_recurring_task(selected_text, recurring_type)
+        display_text = self.task_listbox.get(selected_index)
+        recurring_type = self.get_recurring_type(display_text)
+        task_text = self.extract_task_text(display_text)
+        dismiss_recurring_task(task_text, recurring_type)
         self.task_listbox.delete(selected_index)
 
     def show_completed_tasks(self):
@@ -291,28 +275,29 @@ class TaskKeeperApp:
         listbox_widget.delete(0, END)
 
     def apply_theme(self):
-        self.root.configure(bg=self.theme["bg_main"])
-        self.style.configure("Mainframe.TFrame", background=self.theme["bg_main"])
+        self.root.configure(bg=self.theme.get("bg_main", "#ad7b93"))
+        self.style.configure("Mainframe.TFrame", background=self.theme.get("bg_main", "#ad7b93"))
         self.main_frame.configure(style="Mainframe.TFrame")
-        self.due_date_frame.configure(bg=self.theme["bg_frame"])
-        self.task_frame.configure(bg=self.theme["bg_frame"])
-        self.recurring_frame.configure(bg=self.theme["bg_frame"])
-        self.button_frame.configure(bg=self.theme["bg_frame"])
-        self.date_label.configure(bg=self.theme["bg_label"])
-        self.due_label.configure(bg=self.theme["bg_label"])
-        self.due_entry.configure(bg=self.theme["bg_entry"])
-        self.task_label.configure(bg=self.theme["bg_label"])
-        self.task_entry.configure(bg=self.theme["bg_entry"])
-        self.recurring_check.configure(bg=self.theme["bg_label"])
-        self.recurring_dropdown.configure(background=self.theme["bg_entry"])
-        self.task_listbox.configure(bg=self.theme["bg_listbox"])
-        self.submit_button.configure(bg=self.theme["bg_button"], fg=self.theme["fg_button"])
-        self.delete_button.configure(bg=self.theme["bg_button"], fg=self.theme["fg_button"])
-        self.dismiss_button.configure(bg=self.theme["bg_button"], fg=self.theme["fg_button"])
+        self.due_date_frame.configure(bg=self.theme.get("bg_frame", "#aaaaaa"))
+        self.task_frame.configure(bg=self.theme.get("bg_frame", "#aaaaaa"))
+        self.recurring_frame.configure(bg=self.theme.get("bg_frame", "#aaaaaa"))
+        self.button_frame.configure(bg=self.theme.get("bg_frame", "#aaaaaa"))
+        self.date_label.configure(bg=self.theme.get("bg_label", "#8a6276"), fg=self.theme.get("fg_text", "black"))
+        self.due_label.configure(bg=self.theme.get("bg_label", "#8a6276"), fg=self.theme.get("fg_text", "black"))
+        self.due_entry.configure(bg=self.theme.get("bg_entry", "#e5c3cc"), fg=self.theme.get("fg_text", "black"))
+        self.task_label.configure(bg=self.theme.get("bg_label", "#8a6276"), fg=self.theme.get("fg_text", "black"))
+        self.task_entry.configure(bg=self.theme.get("bg_entry", "#e5c3cc"), fg=self.theme.get("fg_text", "black"))
+        self.recurring_check.configure(bg=self.theme.get("bg_label", "#8a6276"), fg=self.theme.get("fg_text", "black"))
+        self.recurring_dropdown.configure(background=self.theme.get("bg_entry", "#e5c3cc"), foreground=self.theme.get("fg_text", "black"))
+        self.task_listbox.configure(bg=self.theme.get("bg_listbox", "#f5dfe8"), fg=self.theme.get("fg_text", "black"))
+        self.submit_button.configure(bg=self.theme.get("bg_button", "#8a6276"), fg=self.theme.get("fg_button", "white"))
+        self.delete_button.configure(bg=self.theme.get("bg_button", "#8a6276"), fg=self.theme.get("fg_button", "white"))
+        self.dismiss_button.configure(bg=self.theme.get("bg_button", "#8a6276"), fg=self.theme.get("fg_button", "white"))
 
     def select_theme(self, theme_name):
         self.theme = load_theme(theme_name)
         self.apply_theme()
+        save_last_theme(theme_name)
 
     def save_custom_theme(self):
         window = Toplevel(self.root)

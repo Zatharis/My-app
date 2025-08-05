@@ -14,6 +14,7 @@ def set_app_icon(root):
 
 def main():
     root = Tk()
+    root.title("Task Keeper")
     set_app_icon(root)
     app = TaskKeeperApp(root)
     root.mainloop()
