@@ -1,6 +1,6 @@
 import json
 import os
-from datetime import datetime, timedelta
+from datetime import datetime, date
 from tkinter import messagebox, END
 
 DISMISSED_FILE = os.path.join(os.path.expanduser("~"), "Documents", "dismissed_recurring.json")
@@ -32,7 +32,8 @@ def get_display_text(task):
     due = f" | Due: {task['due']}" if task.get("due") else ""
     return f"{indicator} {task['text']} ({task['date']}){due}"
 
-def load_tasks(task_file, listbox, date_string, dismissed_today, displayed_today):
+def load_tasks(task_file, listbox, date_format, dismissed_today, displayed_today):
+    listbox.delete(0, END)  # Clear existing items
     """
     Load tasks from the task file and display them in the listbox.
     Handles recurring and non-recurring tasks.
@@ -47,12 +48,28 @@ def load_tasks(task_file, listbox, date_string, dismissed_today, displayed_today
         recurring_type = task.get("recurring_type", "No")
         indicator = get_recurring_indicator(recurring_type)
         due = f" | Due: {task['due']}" if task.get("due") else ""
-        display_text = f"{indicator} {task['text']} ({task['date']}){due}"
+
+        # Format the date for display
+        try:
+            dt = datetime.strptime(task["date"], "%Y-%m-%d")
+            if date_format == "MM-DD-YYYY":
+                display_date = dt.strftime("%m-%d-%Y")
+            else:
+                display_date = dt.strftime("%d-%m-%Y")
+        except Exception:
+            display_date = task["date"]  # fallback if parsing fails
+
+        display_text = f"{indicator} {task['text']} ({display_date}){due}"
         if recurring_type in ["Daily", "Weekly", "Monthly"]:
             if should_show_recurring(task["text"], recurring_type):
                 listbox.insert("end", display_text)
         else:
             listbox.insert("end", display_text)
+
+      # Clear existing items
+    dismissed_today = set()
+    displayed_today = set()
+    
 
 def delete_task_from_file(task_file, complete_task_file, task_text, date_string):
     """

@@ -9,30 +9,37 @@ from logic.task_data import (
     dismiss_recurring_task,
     should_show_recurring,
     get_display_text,
+    load_tasks,
 )
-from logic.utils import set_window_icon
+from logic.utils import set_window_icon, load_last_date_format, save_last_date_format
 from ui.ui_elements import create_entry, create_button, create_listbox, create_scrollbar, create_dropdown
 import os
-from datetime import date
+from datetime import date, datetime
 import json
 from themes.color_manager import open_color_editor, save_theme
 
 
 class TaskKeeperApp:
+
+    
     def __init__(self, root):
         self.root = root
         set_window_icon(self.root)
         self.style = ttk.Style(self.root)
         last_theme = load_last_theme()
         self.theme = load_theme(last_theme)
-        self.date_string = date.today().strftime("%m-%d-%Y")
+        self.date_format = load_last_date_format()
+        today = date.today()
+        if self.date_format == "MM-DD-YYYY":
+            self.date_string = today.strftime("%m-%d-%Y")
+        else:
+            self.date_string = today.strftime("%d-%m-%Y")
         self.custom_font = ("Comic Sans MS", 12)
         self.recurring_var = StringVar(value="No")
         self.recurring_type_var = StringVar(value="No")
         self.task_file = os.path.join(os.path.expanduser("~"), "Documents", "tasks.json")
         self.complete_task_file = os.path.join(os.path.expanduser("~"), "Documents", "completed_tasks.json")
         self.create_menu()
-        self.date_format = "MM-DD-YYYY"
         self.create_widgets()
         self.apply_theme()
         self.load_tasks()
@@ -105,7 +112,6 @@ class TaskKeeperApp:
             self.recurring_frame,
             self.recurring_type_var,
             ["No", "Daily", "Weekly", "Monthly"],
-            bg=self.theme["bg_button"],
             font=self.custom_font,
         )
         self.recurring_dropdown.pack(side=LEFT, padx=5, pady=5)
@@ -149,9 +155,10 @@ class TaskKeeperApp:
             messagebox.showwarning("Input Error", "Please enter a task")
             return
 
+        iso_date = date.today().isoformat()  # Default to today's date if no due date is provided
         task_data = {
             "text": task_text,
-            "date": self.date_string,
+            "date": iso_date,
             "due": due_date if due_date else None,
             "recurring": recurring,
             "recurring_type": recurring_type
@@ -172,46 +179,6 @@ class TaskKeeperApp:
         self.task_listbox.delete(0, END)
         self.load_tasks()
 
-    def load_tasks(self):
-        self.task_listbox.delete(0, END)
-        dismissed_today = set()  # Load from file if needed
-        displayed_today = set()  # Track displayed recurring tasks if needed
-        from logic.task_data import load_tasks
-        load_tasks(self.task_file, self.task_listbox, self.date_string, dismissed_today, displayed_today)
-
-#    def get_task(self):
-#        task_text = self.task_entry.get().strip()
-#        due_date = self.due_entry.get().strip()
-#        recurring_type = self.recurring_type_var.get()
-#        recurring = recurring_type != "No"
-
-#        if not task_text:
-#            messagebox.showwarning("Input Error", "Please enter a task")
-#            return
-
-#        task_data = {
-#            "text": task_text,
-#            "date": self.date_string,
-#            "due": due_date if due_date else None,
-#            "recurring": recurring,
-#            "recurring_type": recurring_type
-#        }
-
-#        if task_text in self.task_listbox.get(0, END):
-#            messagebox.showinfo("Duplicate Task", "This task already exists.")
-#            return
-
-#        save_task(self.task_file, task_data)
-#        self.task_entry.delete(0, END)
-#        completed = load_completed_tasks(self.complete_task_file)
-#        for task in completed:
-#            if isinstance(task, dict):
-#                display = f'{task.get("text")} ({task.get("date")})'
-#                if task.get("due"):
-#                    display += f' | Due: {task["due"]}'
-#                listbox.insert(END, display)
-#            else:
-#                listbox.insert(END, task)
 
 
     def delete_task(self):
@@ -273,7 +240,7 @@ class TaskKeeperApp:
         self.due_entry.configure(bg=self.theme.get("bg_entry", "#e5c3cc"), fg=self.theme.get("fg_text", "black"))
         self.task_label.configure(bg=self.theme.get("bg_label", "#8a6276"), fg=self.theme.get("fg_text", "black"))
         self.task_entry.configure(bg=self.theme.get("bg_entry", "#e5c3cc"), fg=self.theme.get("fg_text", "black"))
-        self.recurring_dropdown.configure(background=self.theme.get("bg_entry", "#e5c3cc"), foreground=self.theme.get("fg_text", "black"))
+        self.recurring_dropdown.configure(background=self.theme.get("bg_button", "#8a6276"), foreground=self.theme.get("fg_text", "black"))
         self.task_listbox.configure(bg=self.theme.get("bg_listbox", "#f5dfe8"), fg=self.theme.get("fg_text", "black"))
         self.delete_button.configure(bg=self.theme.get("bg_button", "#8a6276"), fg=self.theme.get("fg_button", "white"))
         self.dismiss_button.configure(bg=self.theme.get("bg_button", "#8a6276"), fg=self.theme.get("fg_button", "white"))
@@ -298,7 +265,7 @@ class TaskKeeperApp:
         for task in completed:
             listbox.insert(END, task)
 
-        clear_button = create_button(window, text="Clear Completed", command=lambda: self.clear_completed_tasks(listbox), bg=self.theme["bg_button"], fg=self.theme["fg_button"])
+        clear_button = create_button(window, font=self.custom_font, text="Clear Completed", command=lambda: self.clear_completed_tasks(listbox), bg=self.theme["bg_button"], fg=self.theme["fg_button"])
         clear_button.pack(pady=5)
 
     def clear_completed_tasks(self, listbox_widget):
@@ -336,13 +303,12 @@ class TaskKeeperApp:
 
     def swap_date_format(self):
         # Toggle between two formats
-        if hasattr(self, "date_format") and self.date_format == "MM-DD-YYYY":
+        if self.date_format == "MM-DD-YYYY":
             self.date_format = "DD-MM-YYYY"
         else:
             self.date_format = "MM-DD-YYYY"
 
         # Update the displayed date string
-        from datetime import datetime
         today = datetime.today()
         if self.date_format == "MM-DD-YYYY":
             self.date_string = today.strftime("%m-%d-%Y")
@@ -354,6 +320,7 @@ class TaskKeeperApp:
             self.date_label.config(text=self.date_string)
         if hasattr(self, "due_label"):
             self.due_label.config(text=self.get_due_label_text())
+        save_last_date_format(self.date_format)
         self.load_tasks()
 
     def get_due_label_text(self):
@@ -362,4 +329,9 @@ class TaskKeeperApp:
         else:
             return "Due Date (DD-MM-YYYY):"
 
+    def load_tasks(self):
+        self.task_listbox.delete(0, END)
+        dismissed_today = set()  # Load from file if needed
+        displayed_today = set()  # Track displayed recurring tasks if needed
+        load_tasks(self.task_file, self.task_listbox, self.date_format, dismissed_today, displayed_today)
 

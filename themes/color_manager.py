@@ -108,18 +108,19 @@ def open_color_editor(app):
         save_last_theme(theme_name)
         editor.destroy()
 
-    Label(editor, text="Edit Theme Colors", font=("Arial", 14, "bold"), bg=theme.get("bg_main", "#ad7b93")).pack(pady=10)
+    Label(editor, text="Edit Theme Colors", font=app.custom_font, bg=theme.get("bg_main", "#ad7b93")).pack(pady=10)
     for key in color_keys:
         row = Frame(editor, bg=theme.get("bg_main", "#ad7b93"))
         row.pack(fill=BOTH, padx=10, pady=5)
-        Label(row, text=key, width=12, anchor="w", bg=theme.get("bg_main", "#ad7b93")).pack(side=LEFT)
-        e = Entry(row, textvariable=color_vars[key], width=15, bg=color_vars[key].get())
+        Label(row, text=key, width=12, anchor="w", bg=theme.get("bg_main", "#ad7b93"), font=app.custom_font).pack(side=LEFT)
+        e = Entry(row, textvariable=color_vars[key], width=15, bg=color_vars[key].get(), font=app.custom_font)
         e.pack(side=LEFT, padx=5)
         entries[key] = e
-        Button(row, text="Pick", command=lambda k=key: choose_color(k)).pack(side=RIGHT, padx=5)
+        Button(row, text="Pick", command=lambda k=key: choose_color(k), font=app.custom_font).pack(side=RIGHT, padx=5)
 
     Button(
         editor,
+        font=app.custom_font,
         text="Save",
         command=save_and_close,
         bg=color_vars["bg_button"].get(),
