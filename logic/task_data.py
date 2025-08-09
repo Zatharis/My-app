@@ -1,6 +1,6 @@
 import json
 import os
-from datetime import datetime
+from datetime import datetime, timedelta
 from tkinter import messagebox, END
 
 DISMISSED_FILE = os.path.join(os.path.expanduser("~"), "Documents", "dismissed_recurring.json")
@@ -81,8 +81,11 @@ def delete_task_from_file(task_file, complete_task_file, task_text, date_string)
                 completed = json.load(f)
         except (FileNotFoundError, json.JSONDecodeError):
             completed = []
-        due = f" | Due: {deleted_task.get('due')}" if deleted_task.get("due") else ""
-        completed.append(f'{deleted_task.get("text")} ({deleted_task.get("date")}){due}')
+        completed.append({
+            "text": deleted_task.get("text"),
+            "date": deleted_task.get("date"),
+            "due": deleted_task.get("due")
+        })
         with open(complete_task_file, "w") as f:
             json.dump(completed, f, indent=2)
 
@@ -114,39 +117,38 @@ def save_dismissed_recurring(dismissed):
         json.dump(dismissed, f, indent=2)
 
 def dismiss_recurring_task(task_text, recurring_type):
+    """
+    Dismiss a recurring task for the appropriate period.
+    Uses a composite key to avoid conflicts between tasks with the same text but different recurrence.
+    """
     dismissed = load_dismissed_recurring()
     today = datetime.today().strftime("%Y-%m-%d")
-    dismissed[task_text] = {"date": today, "type": recurring_type}
+    key = f"{task_text}|{recurring_type}"
+    dismissed[key] = {"date": today, "type": recurring_type}
     save_dismissed_recurring(dismissed)
 
 def should_show_recurring(task_text, recurring_type):
     """
-    Determine if a recurring task should be shown today.
+    Determine if a recurring task should be shown, based on its dismissal and type.
+    Uses a composite key to match the correct recurrence.
     """
-    # Implement your logic for recurring task display here
-    # For now, always show unless dismissed
-    return True
+    dismissed = load_dismissed_recurring()
+    key = f"{task_text}|{recurring_type}"
+    info = dismissed.get(key)
+    if not info or info.get("type") != recurring_type:
+        return True
 
-def get_task(self):
-    task_text = self.task_entry.get().strip()
-    due_date = self.due_entry.get().strip()
-    recurring_type = self.recurring_var.get()  # Should be "No", "Daily", "Weekly", "Monthly"
+    dismissed_date = datetime.strptime(info.get("date"), "%Y-%m-%d")
+    today = datetime.today()
 
-    if not task_text:
-        messagebox.showwarning("Input Error", "Please enter a task")
-        return
-
-    task_data = {
-        "text": task_text,
-        "date": self.date_string,
-        "due": due_date if due_date else None,
-        "recurring": recurring_type != "No",
-        "recurring_type": recurring_type
-    }
-
-    if task_text in self.task_listbox.get(0, END):
-        messagebox.showinfo("Duplicate Task", "This task already exists.")
-        return
-
-    save_task(self.task_file, task_data)
-    self.task_entry.delete(0, END)
+    if recurring_type == "Daily":
+        # Hide only for the same day
+        return dismissed_date.date() != today.date()
+    elif recurring_type == "Weekly":
+        # Hide for 7 days
+        return (today - dismissed_date).days >= 7
+    elif recurring_type == "Monthly":
+        # Hide for 30 days (approximate a month)
+        return (today - dismissed_date).days >= 30
+    else:
+        return True

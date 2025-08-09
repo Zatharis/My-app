@@ -1,12 +1,13 @@
 import json
 import os
 from logic.utils import set_window_icon, resource_path
+from tkinter import Toplevel, Label, Button, colorchooser, StringVar, Entry, Frame, LEFT, RIGHT, BOTH
 
 DEFAULT_THEME = {
     "bg_main": "#ad7b93",
     "bg_entry": "#e5c3cc",
     "bg_button": "#8a6276",
-    "fg_button": "white",
+    "fg_button": "black",
     "bg_listbox": "#f5dfe8",
     "bg_frame": "#aaaaaa",
     "bg_label": "#8a6276",
@@ -67,4 +68,64 @@ def load_last_theme():
             pass
     return "Default"
 
-# Color editor logic should be defined in a function and called from your app, not at module level.
+def open_color_editor(app):
+    """
+    Open a color editor dialog to edit the current theme.
+    """
+    theme = app.theme.copy()
+    editor = Toplevel(app.root)
+    editor.title("Edit Theme Colors")
+    set_window_icon(editor)
+    editor.geometry("400x500")
+    editor.configure(bg=theme.get("bg_main", "#ad7b93"))
+
+    color_keys = [
+        "bg_main", "bg_entry", "bg_button", "fg_button",
+        "bg_listbox", "bg_frame", "bg_label", "fg_text"
+    ]
+    color_vars = {k: StringVar(value=theme.get(k, "")) for k in color_keys}
+    entries = {}
+
+    def choose_color(key):
+        color = colorchooser.askcolor(color_vars[key].get(), parent=editor)[1]
+        if color:
+            color_vars[key].set(color)
+            entries[key].configure(bg=color)
+            preview_theme()
+
+    def preview_theme():
+        # Update app theme live for preview
+        preview = {k: v.get() for k, v in color_vars.items()}
+        app.theme = preview
+        app.apply_theme()
+
+    def save_and_close():
+        new_theme = {k: v.get() for k, v in color_vars.items()}
+        theme_name = app.theme_name if hasattr(app, "theme_name") else "Custom"
+        save_theme(theme_name, new_theme)
+        app.theme = new_theme
+        app.apply_theme()
+        save_last_theme(theme_name)
+        editor.destroy()
+
+    Label(editor, text="Edit Theme Colors", font=("Arial", 14, "bold"), bg=theme.get("bg_main", "#ad7b93")).pack(pady=10)
+    for key in color_keys:
+        row = Frame(editor, bg=theme.get("bg_main", "#ad7b93"))
+        row.pack(fill=BOTH, padx=10, pady=5)
+        Label(row, text=key, width=12, anchor="w", bg=theme.get("bg_main", "#ad7b93")).pack(side=LEFT)
+        e = Entry(row, textvariable=color_vars[key], width=15, bg=color_vars[key].get())
+        e.pack(side=LEFT, padx=5)
+        entries[key] = e
+        Button(row, text="Pick", command=lambda k=key: choose_color(k)).pack(side=RIGHT, padx=5)
+
+    Button(
+        editor,
+        text="Save",
+        command=save_and_close,
+        bg=color_vars["bg_button"].get(),
+        fg=color_vars["fg_button"].get()
+    ).pack(pady=20)
+
+    # Live preview on entry change
+    for var in color_vars.values():
+        var.trace_add("write", lambda *args: preview_theme())
