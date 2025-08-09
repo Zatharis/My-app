@@ -70,11 +70,11 @@ class TaskKeeperApp:
             )
         menubar.add_cascade(label="Themes", menu=themesmenu)
 
-        # --- Developer menu (for saving and editing themes) ---
-        devmenu = Menu(menubar, tearoff=0)
-        devmenu.add_command(label="Edit Custom", command=lambda: open_color_editor(self))
-        devmenu.add_command(label="Save Custom", command=lambda: self.save_custom_theme())
-        menubar.add_cascade(label="Developer", menu=devmenu)
+         # --- Developer menu (for saving and editing themes) ---
+        #devmenu = Menu(menubar, tearoff=0)
+        #devmenu.add_command(label="Edit Custom", command=lambda: open_color_editor(self))
+        #devmenu.add_command(label="Save Custom", command=lambda: self.save_custom_theme())
+        #menubar.add_cascade(label="Developer", menu=devmenu)
 
         self.root.config(menu=menubar)
 
