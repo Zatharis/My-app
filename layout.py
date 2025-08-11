@@ -263,7 +263,22 @@ class TaskKeeperApp:
 
         completed = load_completed_tasks(self.complete_task_file)
         for task in completed:
-            listbox.insert(END, task)
+            if isinstance(task, dict):
+                text = task.get("text", "")
+                completed_on = task.get("completed_on", "")
+                #format the date for display
+                try:
+                    dt = datetime.strptime(completed_on, "%Y-%m-%d")
+                    if self.date_format == "MM-DD-YYYY":
+                        display_date = dt.strftime("%m-%d-%Y")
+                    else:
+                        display_date = dt.strftime("%d-%m-%Y")
+                except Exception:
+                    display_date = completed_on
+                display = f"{text} (Completed on: {display_date})"
+                listbox.insert(END, display)
+            else:
+                listbox.insert(END, str(task))
 
         clear_button = create_button(window, font=self.custom_font, text="Clear Completed", command=lambda: self.clear_completed_tasks(listbox), bg=self.theme["bg_button"], fg=self.theme["fg_button"])
         clear_button.pack(pady=5)
