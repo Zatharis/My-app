@@ -73,7 +73,8 @@ def load_tasks(task_file, listbox, date_format, dismissed_today, displayed_today
 
 def delete_task_from_file(task_file, complete_task_file, task_text, date_string):
     """
-    Delete a task from the task file and add it to the completed file.
+    Delete a task from the task file and add it to the completed file,
+    saving the date it was completed as 'completed_on'.
     """
     try:
         with open(task_file, "r") as f:
@@ -81,17 +82,18 @@ def delete_task_from_file(task_file, complete_task_file, task_text, date_string)
     except (FileNotFoundError, json.JSONDecodeError):
         tasks = []
 
-    new_tasks = []
+    # Find and remove the deleted task
     deleted_task = None
-    for task in tasks:
+    for i, task in enumerate(tasks):
         if task["text"] == task_text:
-            deleted_task = task
-            continue
-        new_tasks.append(task)
+            deleted_task = tasks.pop(i)
+            break
 
+    # Save updated tasks
     with open(task_file, "w") as f:
-        json.dump(new_tasks, f, indent=2)
+        json.dump(tasks, f, indent=2)
 
+    # Save to completed tasks with completion date and original info
     if deleted_task:
         try:
             with open(complete_task_file, "r") as f:
@@ -101,7 +103,8 @@ def delete_task_from_file(task_file, complete_task_file, task_text, date_string)
         completed.append({
             "text": deleted_task.get("text"),
             "date": deleted_task.get("date"),
-            "due": deleted_task.get("due")
+            "due": deleted_task.get("due"),
+            "completed_on": date.today().isoformat()
         })
         with open(complete_task_file, "w") as f:
             json.dump(completed, f, indent=2)
