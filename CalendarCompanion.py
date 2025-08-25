@@ -35,7 +35,7 @@ class CalendarApp:
         self.root = root
         self.root.title("Task Calendar Companion")
         self.theme = load_theme(load_last_theme())
-        self.root.configure(bg=self.theme["bg_main"])  # <-- Add this line
+        self.root.configure(bg=self.theme["bg_main"])
         self.tasks = load_tasks()
         self.completed_tasks = load_completed_tasks()
         self.dismissed_recurring = load_dismissed_recurring()
@@ -59,21 +59,33 @@ class CalendarApp:
         dismissed = load_dismissed_recurring()
         dismissed_set = set()
         for key, info in dismissed.items():
-            text, recurring_type = key.split("|")
+            if "|" not in key:
+                continue  # Skip malformed keys
+            text, recurring_type = key.split("|", 1)
             for dismissed_date in info.get("dates", []):
                 dismissed_set.add((text, dismissed_date, recurring_type))
 
-        month_label = Label(
+        # Month name label at the top, inside a themed frame
+        month_frame = Frame(
             self.root,
+            bg=self.theme["bg_frame"],
+            borderwidth=2,
+            relief="groove",
+            highlightbackground=self.theme["bg_frame"],
+            highlightcolor=self.theme["bg_frame"]
+        )
+        month_frame.pack(padx=5, pady=(5, 0), anchor="n")
+
+        month_label = Label(
+            month_frame,
             text=now.strftime("%B %Y"),
             font=("Comic Sans MS", 14, "bold"),
             bg=self.theme["bg_label"],
             fg=self.theme["fg_text"],
-            borderwidth=2,
-            relief="groove",
+            borderwidth=0,
             pady=4
         )
-        month_label.pack(padx=5, pady=(5, 0), anchor="n")
+        month_label.pack(padx=8, pady=4)
 
         calendar_frame = Frame(self.root, bg=self.theme["bg_main"])
         calendar_frame.pack(fill=BOTH, expand=True)
@@ -90,16 +102,20 @@ class CalendarApp:
             parse_fmt = "%d-%m-%Y"
 
         for day in range(1, days_in_month + 1):
-            cell_frame = Frame(calendar_frame, bg=self.theme["bg_entry"], borderwidth=1, relief="solid")
+            cell_frame = Frame(
+                calendar_frame,
+                bg=self.theme["bg_entry"],
+                borderwidth=2,
+                relief="groove",
+                highlightbackground=self.theme["bg_frame"],
+                highlightcolor=self.theme["bg_frame"]
+            )
             cell_frame.grid(row=(day-1)//7, column=(day-1)%7, padx=2, pady=2, sticky="nsew")
 
-            # Set a fixed height for the canvas
-            canvas_height = 100  # Try 100 or adjust as needed
+            canvas_height = 100
             canvas = Canvas(cell_frame, bg=self.theme["bg_entry"], highlightthickness=0, height=canvas_height)
             scrollbar = Scrollbar(cell_frame, orient="vertical", command=canvas.yview)
             canvas.configure(yscrollcommand=scrollbar.set)
-
-            # Do NOT use expand=True here!
             canvas.pack(side="left", fill="both")
             scrollbar.pack(side="right", fill="y")
 
@@ -107,18 +123,33 @@ class CalendarApp:
             canvas.create_window((0, 0), window=inner_frame, anchor="nw")
 
             def _on_frame_configure(event, canvas=canvas):
-                # Always make the scrollregion at least 1 pixel taller than the canvas
                 content_height = max(canvas.bbox("all")[3], canvas_height + 1)
                 canvas.configure(scrollregion=(0, 0, canvas.winfo_width(), content_height))
             inner_frame.bind("<Configure>", _on_frame_configure)
 
-            Button(inner_frame, text=str(day), font=("Comic Sans MS", 12, "bold"),
-                   bg=self.theme["bg_button"], fg=self.theme["fg_text"], anchor="w",
-                   command=lambda d=day: self.show_day_tasks(d, now, completed_set, dismissed_set, parse_fmt)
-            ).pack(anchor="nw")
+            # Button inside a themed frame for border
+            button_frame = Frame(
+                inner_frame,
+                bg=self.theme["bg_frame"],
+                borderwidth=2,
+                relief="groove",
+                highlightbackground=self.theme["bg_frame"],
+                highlightcolor=self.theme["bg_frame"]
+            )
+            button_frame.pack(anchor="nw", pady=2)
+
+            Button(
+                button_frame,
+                text=str(day),
+                font=("Comic Sans MS", 12, "bold"),
+                bg=self.theme["bg_button"],
+                fg=self.theme["fg_text"],
+                anchor="w",
+                command=lambda d=day: self.show_day_tasks(d, now, completed_set, dismissed_set, parse_fmt)
+            ).pack(padx=2, pady=2)
 
             current_date = datetime(now.year, now.month, day)
-            current_date_str = current_date.strftime("%Y-%m-%d")  # ISO format for matching
+            current_date_str = current_date.strftime("%Y-%m-%d")
 
             for task in self.tasks:
                 show_date = task.get("due") or task.get("date")
@@ -143,22 +174,17 @@ class CalendarApp:
                 elif recurring_type == "No" and parsed and parsed.day == day and parsed.month == now.month:
                     show_task = True
 
-                # --- Hide recurring tasks if completed on this date ---
                 if show_task and recurring_type in ["Daily", "Weekly", "Monthly"]:
                     if (task["text"], current_date_str) in completed_set:
                         show_task = False
-
-                # --- Hide recurring tasks if dismissed on this date ---
-                if show_task and recurring_type in ["Daily", "Weekly", "Monthly"]:
                     if (task["text"], current_date_str, recurring_type) in dismissed_set:
                         show_task = False
 
                 if show_task:
-                    Label(inner_frame, text=f"- {task['text']}", font=("Comic Sans MS", 11),
+                    Label(inner_frame, text=f"- {task['text']}", font=("Comic Sans MS", 13),
                           bg=self.theme["bg_entry"], fg=self.theme["fg_text"], anchor="w", wraplength=120).pack(anchor="nw")
 
             inner_frame.update_idletasks()
-            # Only update scrollregion here, not canvas height
             content_height = max(canvas.bbox("all")[3], canvas_height + 1)
             canvas.config(scrollregion=(0, 0, canvas.winfo_width(), content_height))
             canvas.yview_moveto(0)
@@ -211,7 +237,7 @@ class CalendarApp:
                     show_task = False
 
             if show_task:
-                Label(inner_frame, text=f"- {task['text']}", font=("Comic Sans MS", 11),
+                Label(inner_frame, text=f"- {task['text']}", font=("Comic Sans MS", 13),
                       bg=self.theme["bg_entry"], fg=self.theme["fg_text"], anchor="w", wraplength=300).pack(anchor="nw", pady=2)
 
         inner_frame.update_idletasks()
