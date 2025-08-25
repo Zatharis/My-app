@@ -132,19 +132,26 @@ def save_dismissed_recurring(dismissed):
 
 def dismiss_recurring_task(task_text, recurring_type):
     """
-    Dismiss a recurring task for the appropriate period.
-    Uses a composite key to avoid conflicts between tasks with the same text but different recurrence.
+    Dismiss a recurring task for a specific day.
+    Stores a list of dismissed dates for each task+type.
     """
     dismissed = load_dismissed_recurring()
     today = datetime.today().strftime("%Y-%m-%d")
     key = f"{task_text}|{recurring_type}"
-    dismissed[key] = {"date": today, "type": recurring_type}
+    # Always ensure 'dates' is a list
+    if key not in dismissed:
+        dismissed[key] = {"dates": [], "type": recurring_type}
+    if "dates" not in dismissed[key] or not isinstance(dismissed[key]["dates"], list):
+        dismissed[key]["dates"] = []
+    if today not in dismissed[key]["dates"]:
+        dismissed[key]["dates"].append(today)
     save_dismissed_recurring(dismissed)
 
-def should_show_recurring(task_text, recurring_type):
+def should_show_recurring(task_text, recurring_type, check_date=None):
     """
     Determine if a recurring task should be shown, based on its dismissal and type.
     Uses a composite key to match the correct recurrence.
+    If check_date is None, uses today.
     """
     dismissed = load_dismissed_recurring()
     key = f"{task_text}|{recurring_type}"
@@ -152,17 +159,6 @@ def should_show_recurring(task_text, recurring_type):
     if not info or info.get("type") != recurring_type:
         return True
 
-    dismissed_date = datetime.strptime(info.get("date"), "%Y-%m-%d")
-    today = datetime.today()
-
-    if recurring_type == "Daily":
-        # Hide only for the same day
-        return dismissed_date.date() != today.date()
-    elif recurring_type == "Weekly":
-        # Hide for 7 days
-        return (today - dismissed_date).days >= 7
-    elif recurring_type == "Monthly":
-        # Hide for 30 days (approximate a month)
-        return (today - dismissed_date).days >= 30
-    else:
-        return True
+    if check_date is None:
+        check_date = datetime.today().strftime("%Y-%m-%d")
+    return check_date not in info.get("dates", [])

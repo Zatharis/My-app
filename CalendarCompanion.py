@@ -60,8 +60,7 @@ class CalendarApp:
         dismissed_set = set()
         for key, info in dismissed.items():
             text, recurring_type = key.split("|")
-            dismissed_date = info.get("date")
-            if text and dismissed_date and recurring_type:
+            for dismissed_date in info.get("dates", []):
                 dismissed_set.add((text, dismissed_date, recurring_type))
 
         month_label = Label(
