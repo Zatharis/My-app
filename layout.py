@@ -17,6 +17,8 @@ import os
 from datetime import date, datetime
 import json
 from themes.color_manager import open_color_editor, save_theme
+import subprocess
+import sys
 
 
 class TaskKeeperApp:
@@ -56,6 +58,7 @@ class TaskKeeperApp:
         viewmenu = Menu(menubar, tearoff=0)
         viewmenu.add_command(label="Completed Tasks", command=self.show_completed_tasks)
         viewmenu.add_command(label="Swap Date Format", command=self.swap_date_format)
+        viewmenu.add_command(label="Open Calendar", command=self.launch_calendar)  # <-- Add this line
         menubar.add_cascade(label="View", menu=viewmenu)
 
         
@@ -349,4 +352,9 @@ class TaskKeeperApp:
         dismissed_today = set()  # Load from file if needed
         displayed_today = set()  # Track displayed recurring tasks if needed
         load_tasks(self.task_file, self.task_listbox, self.date_format, dismissed_today, displayed_today)
+
+    def launch_calendar(self):
+        # Use sys.executable to ensure the same Python interpreter is used
+        calendar_path = os.path.join(os.path.dirname(__file__), "CalendarCompanion.py")
+        subprocess.Popen([sys.executable, calendar_path])
 

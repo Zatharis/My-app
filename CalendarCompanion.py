@@ -1,6 +1,6 @@
 import os
 import json
-from tkinter import Tk, Frame, Label, BOTH, Canvas, Scrollbar
+from tkinter import Tk, Frame, Label, BOTH, Canvas, Scrollbar, Button
 from datetime import datetime
 import calendar
 from logic.utils import resource_path, load_last_date_format
@@ -113,8 +113,10 @@ class CalendarApp:
                 canvas.configure(scrollregion=(0, 0, canvas.winfo_width(), content_height))
             inner_frame.bind("<Configure>", _on_frame_configure)
 
-            Label(inner_frame, text=str(day), font=("Comic Sans MS", 12, "bold"),
-                  bg=self.theme["bg_entry"], fg=self.theme["fg_text"], anchor="w").pack(anchor="nw")
+            Button(inner_frame, text=str(day), font=("Comic Sans MS", 12, "bold"),
+                   bg=self.theme["bg_button"], fg=self.theme["fg_text"], anchor="w",
+                   command=lambda d=day: self.show_day_tasks(d, now, completed_set, dismissed_set, parse_fmt)
+            ).pack(anchor="nw")
 
             current_date = datetime(now.year, now.month, day)
             current_date_str = current_date.strftime("%Y-%m-%d")  # ISO format for matching
@@ -162,6 +164,59 @@ class CalendarApp:
             canvas.config(scrollregion=(0, 0, canvas.winfo_width(), content_height))
             canvas.yview_moveto(0)
             scrollbar.lift()
+
+    def show_day_tasks(self, day, now, completed_set, dismissed_set, parse_fmt):
+        popup = Tk()
+        popup.title(f"Tasks for {now.strftime('%B')} {day}")
+        popup.configure(bg=self.theme["bg_main"])
+
+        canvas = Canvas(popup, bg=self.theme["bg_entry"], highlightthickness=0)
+        scrollbar = Scrollbar(popup, orient="vertical", command=canvas.yview)
+        canvas.configure(yscrollcommand=scrollbar.set)
+        canvas.pack(side="left", fill="both", expand=True)
+        scrollbar.pack(side="right", fill="y")
+
+        inner_frame = Frame(canvas, bg=self.theme["bg_entry"])
+        canvas.create_window((0, 0), window=inner_frame, anchor="nw")
+
+        current_date = datetime(now.year, now.month, day)
+        current_date_str = current_date.strftime("%Y-%m-%d")
+
+        for task in self.tasks:
+            show_date = task.get("due") or task.get("date")
+            recurring_type = task.get("recurring_type", "No")
+            parsed = None
+            for fmt in ("%Y-%m-%d", parse_fmt):
+                try:
+                    parsed = datetime.strptime(show_date, fmt)
+                    break
+                except Exception:
+                    continue
+
+            show_task = False
+            if recurring_type == "Daily":
+                show_task = True
+            elif recurring_type == "Weekly" and parsed:
+                if current_date.weekday() == parsed.weekday():
+                    show_task = True
+            elif recurring_type == "Monthly" and parsed:
+                if day == parsed.day:
+                    show_task = True
+            elif recurring_type == "No" and parsed and parsed.day == day and parsed.month == now.month:
+                show_task = True
+
+            if show_task and recurring_type in ["Daily", "Weekly", "Monthly"]:
+                if (task["text"], current_date_str) in completed_set:
+                    show_task = False
+                if (task["text"], current_date_str, recurring_type) in dismissed_set:
+                    show_task = False
+
+            if show_task:
+                Label(inner_frame, text=f"- {task['text']}", font=("Comic Sans MS", 11),
+                      bg=self.theme["bg_entry"], fg=self.theme["fg_text"], anchor="w", wraplength=300).pack(anchor="nw", pady=2)
+
+        inner_frame.update_idletasks()
+        canvas.config(scrollregion=canvas.bbox("all"))
 
 if __name__ == "__main__":
     root = Tk()
