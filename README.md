@@ -50,15 +50,5 @@ Download the `TaskKeeper.exe` file and run it. No installation necessary. Tasks 
 
 
 
-1\. Clone the repo:
-
-
-
-&nbsp;  ```bash
-
-&nbsp;  git clone https://github.com/your-username/task-keeper.git
-
-&nbsp;  cd task-keeper
-
 
 
