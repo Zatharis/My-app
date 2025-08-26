@@ -1,4 +1,5 @@
 import os
+import json
 from tkinter import Tk, PhotoImage
 from layout import TaskKeeperApp
 from logic.utils import resource_path
@@ -15,6 +16,17 @@ def set_app_icon(root):
             print("Failed to set window icon:", e)
     else:
         print("Icon not found at:", icon_path)
+
+def load_tasks(task_file):
+    try:
+        with open(task_file, "r") as f:
+            return json.load(f)
+    except (FileNotFoundError, json.JSONDecodeError):
+        return []
+
+def save_tasks(task_file, tasks):
+    with open(task_file, "w") as f:
+        json.dump(tasks, f, indent=2)
 
 def main():
     root = Tk()

@@ -32,8 +32,8 @@ def get_display_text(task):
     due = f" | Due: {task['due']}" if task.get("due") else ""
     return f"{indicator} {task['text']} ({task['date']}){due}"
 
-def load_tasks(task_file, listbox, date_format, dismissed_today, displayed_today):
-    listbox.delete(0, END)  # Clear existing items
+def display_tasks_in_listbox(task_file, listbox, date_format, dismissed_today, displayed_today):
+    listbox.delete(0, END)
     """
     Load tasks from the task file and display them in the listbox.
     Handles recurring and non-recurring tasks.
@@ -61,7 +61,8 @@ def load_tasks(task_file, listbox, date_format, dismissed_today, displayed_today
 
         display_text = f"{indicator} {task['text']} ({display_date}){due}"
         if recurring_type in ["Daily", "Weekly", "Monthly"]:
-            if should_show_recurring(task["text"], recurring_type):
+            # FIX: Pass the actual task date to should_show_recurring
+            if should_show_recurring(task["text"], recurring_type, check_date=task["date"]):
                 listbox.insert("end", display_text)
         else:
             listbox.insert("end", display_text)
@@ -162,3 +163,13 @@ def should_show_recurring(task_text, recurring_type, check_date=None):
     if check_date is None:
         check_date = datetime.today().strftime("%Y-%m-%d")
     return check_date not in info.get("dates", [])
+
+def load_tasks(task_file):
+    if not os.path.exists(task_file):
+        return []
+    try:
+        with open(task_file, "r") as f:
+            return json.load(f)
+    except json.JSONDecodeError:
+        # Don't overwrite the file, just return empty
+        return []

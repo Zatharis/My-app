@@ -174,6 +174,14 @@ class CalendarApp:
                 elif recurring_type == "No" and parsed and parsed.day == day and parsed.month == now.month:
                     show_task = True
 
+                # New date comparison logic
+                today = datetime.now()
+                if show_task and current_date < today.replace(hour=0, minute=0, second=0, microsecond=0):
+                    # Only show tasks that were created on or before this date
+                    created_date = datetime.strptime(task.get("date", ""), "%Y-%m-%d")
+                    if created_date > current_date:
+                        show_task = False  # Skip tasks created after this day
+
                 if show_task and recurring_type in ["Daily", "Weekly", "Monthly"]:
                     if (task["text"], current_date_str) in completed_set:
                         show_task = False

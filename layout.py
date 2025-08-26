@@ -10,11 +10,12 @@ from logic.task_data import (
     should_show_recurring,
     get_display_text,
     load_tasks,
+    display_tasks_in_listbox,
 )
 from logic.utils import set_window_icon, load_last_date_format, save_last_date_format
 from ui.ui_elements import create_entry, create_button, create_listbox, create_scrollbar, create_dropdown
 import os
-from datetime import date, datetime
+from datetime import date, datetime, timedelta
 import json
 from themes.color_manager import open_color_editor, save_theme
 import subprocess
@@ -45,6 +46,8 @@ class TaskKeeperApp:
         self.create_widgets()
         self.apply_theme()
         self.load_tasks()
+        daily_exp_check(self)  # <-- Add this line
+        self.load_exp_level()  # Load experience and level on startup
 
     def create_menu(self):
         menubar = Menu(self.root)
@@ -87,10 +90,22 @@ class TaskKeeperApp:
         self.main_frame = ttk.Frame(self.root, style="Mainframe.TFrame")
         self.main_frame.pack(fill=BOTH, expand=True, padx=10, pady=10)
 
-        # --- LEFT SIDE ---
-        # Date label
-        self.date_label = Label(self.main_frame, text=self.date_string, font=self.custom_font, bg=self.theme["bg_label"])
-        self.date_label.grid(row=0, column=0, padx=5, pady=5, sticky=W)
+        # --- EXP BAR AT TOP LEFT ---
+        self.exp_var = IntVar(value=0)
+        self.level_var = IntVar(value=1)
+
+        # Frame for date and exp bar
+        self.top_frame = Frame(self.main_frame, bg=self.theme["bg_frame"])
+        self.top_frame.grid(row=0, column=0, columnspan=3, sticky=W+E, padx=5, pady=5)
+
+        self.date_label = Label(self.top_frame, text=self.date_string, font=self.custom_font, bg=self.theme["bg_label"])
+        self.date_label.pack(side=LEFT, padx=5)
+
+        self.exp_bar = ttk.Progressbar(self.top_frame, orient="horizontal", length=200, mode="determinate", variable=self.exp_var, maximum=100)
+        self.exp_bar.pack(side=LEFT, padx=5)
+
+        self.level_label = Label(self.top_frame, text="Lv. 1", font=self.custom_font, bg=self.theme["bg_label"])
+        self.level_label.pack(side=LEFT, padx=5)
 
         # Due date group frame
         self.due_date_frame = Frame(self.main_frame, bg=self.theme["bg_frame"], bd=2, relief=GROOVE)
@@ -191,8 +206,28 @@ class TaskKeeperApp:
             return
         display_text = self.task_listbox.get(selected_index)
         task_text = self.extract_task_text(display_text)
+
+        # Before deleting:
+        task_due_date = None
+        try:
+            with open(self.task_file, "r") as f:
+                tasks = json.load(f)
+            for task in tasks:
+                if task["text"] == task_text:
+                    task_due_date = task.get("due")
+                    break
+        except Exception:
+            pass
+
+        if task_due_date:
+            today_iso = date.today().isoformat()
+            if task_due_date != today_iso:
+                messagebox.showinfo("Not Due Yet", "This task can't be completed until its due date.")
+                return
+
         delete_task_from_file(self.task_file, self.complete_task_file, task_text, self.date_string)
         self.task_listbox.delete(selected_index)
+        self.gain_exp(10)
 
     def dismiss_recurring(self):
         selected_index = self.task_listbox.curselection()
@@ -204,6 +239,7 @@ class TaskKeeperApp:
         task_text = self.extract_task_text(display_text)
         dismiss_recurring_task(task_text, recurring_type)
         self.task_listbox.delete(selected_index)
+        self.gain_exp(5)
 
     def extract_task_text(self, display_text):
         # Handles format: "[D] Task name (date) | Due: ..."
@@ -348,13 +384,134 @@ class TaskKeeperApp:
             return "Due Date (DD-MM-YYYY):"
 
     def load_tasks(self):
-        self.task_listbox.delete(0, END)
-        dismissed_today = set()  # Load from file if needed
-        displayed_today = set()  # Track displayed recurring tasks if needed
-        load_tasks(self.task_file, self.task_listbox, self.date_format, dismissed_today, displayed_today)
+        dismissed_today = set()
+        displayed_today = set()
+        display_tasks_in_listbox(self.task_file, self.task_listbox, self.date_format, dismissed_today, displayed_today)
 
     def launch_calendar(self):
         # Use sys.executable to ensure the same Python interpreter is used
         calendar_path = os.path.join(os.path.dirname(__file__), "CalendarCompanion.py")
         subprocess.Popen([sys.executable, calendar_path])
+
+    def gain_exp(self, amount):
+        exp = self.exp_var.get() + amount
+        level = self.level_var.get()
+        while exp >= 100 and level < 99:
+            exp -= 100
+            level += 1
+        self.exp_var.set(exp)
+        self.level_var.set(level)
+        self.level_label.config(text=f"Lv. {level}")
+        self.save_exp_level()  # Save experience and level whenever they change
+
+    def lose_exp(self, amount):
+        exp = self.exp_var.get() - amount
+        level = self.level_var.get()
+        while exp < 0 and level > 1:
+            exp += 100
+            level -= 1
+        exp = max(exp, 0)
+        self.exp_var.set(exp)
+        self.level_var.set(level)
+        self.level_label.config(text=f"Lv. {level}")
+        self.save_exp_level()  # Save experience and level whenever they change
+
+    def save_exp_level(self):
+        data = {
+            "exp": self.exp_var.get(),
+            "level": self.level_var.get()
+        }
+        exp_file = os.path.join(os.path.expanduser("~"), "Documents", "exp_level.json")
+        with open(exp_file, "w") as f:
+            json.dump(data, f)
+
+    def load_exp_level(self):
+        exp_file = os.path.join(os.path.expanduser("~"), "Documents", "exp_level.json")
+        if os.path.exists(exp_file):
+            try:
+                with open(exp_file, "r") as f:
+                    data = json.load(f)
+                self.exp_var.set(data.get("exp", 0))
+                self.level_var.set(data.get("level", 1))
+                self.level_label.config(text=f"Lv. {self.level_var.get()}")
+            except Exception:
+                self.exp_var.set(0)
+                self.level_var.set(1)
+                self.level_label.config(text="Lv. 1")
+        else:
+            self.exp_var.set(0)
+            self.level_var.set(1)
+            self.level_label.config(text="Lv. 1")
+
+def daily_exp_check(app):
+    today = date.today()
+    yesterday = today - timedelta(days=1)
+
+    # Load tasks, completed, and dismissed
+    try:
+        with open(app.task_file, "r") as f:
+            tasks = json.load(f)
+    except Exception:
+        tasks = []
+    try:
+        with open(app.complete_task_file, "r") as f:
+            completed = json.load(f)
+    except Exception:
+        completed = []
+    try:
+        from logic.task_data import load_dismissed_recurring
+        dismissed = load_dismissed_recurring()
+    except Exception:
+        dismissed = {}
+
+    # Build lookup sets
+    completed_set = set()
+    for entry in completed:
+        if isinstance(entry, dict):
+            text = entry.get("text")
+            completed_on = entry.get("completed_on") or entry.get("date")
+            if text and completed_on:
+                completed_set.add((text, completed_on))
+
+    dismissed_set = set()
+    for key, info in dismissed.items():
+        if "|" not in key:
+            continue
+        text, recurring_type = key.split("|", 1)
+        for dismissed_date in info.get("dates", []):
+            dismissed_set.add((text, dismissed_date, recurring_type))
+
+    # Check yesterday's tasks
+    for task in tasks:
+        text = task.get("text")
+        recurring_type = task.get("recurring_type", "No")
+        due = task.get("due")
+        created = task.get("date")
+        if recurring_type not in ["Daily", "Weekly", "Monthly"]:
+            continue
+
+        # If due date is in the future, skip
+        if due:
+            try:
+                due_date = datetime.strptime(due, "%Y-%m-%d").date()
+                if due_date > yesterday:
+                    continue
+            except Exception:
+                pass
+
+        # If task was created after yesterday, skip
+        if created:
+            try:
+                created_date = datetime.strptime(created, "%Y-%m-%d").date()
+                if created_date > yesterday:
+                    continue
+            except Exception:
+                pass
+
+        # If completed or dismissed yesterday, gain exp
+        if (text, yesterday.strftime("%Y-%m-%d")) in completed_set or \
+           (text, yesterday.strftime("%Y-%m-%d"), recurring_type) in dismissed_set:
+            app.gain_exp(10)
+        else:
+            app.lose_exp(5)
 
