@@ -12,6 +12,8 @@ DEFAULT_THEME = {
     "bg_frame": "#aaaaaa",
     "bg_label": "#8a6276",
     "fg_text": "black",
+    "exp_bar_fg": "#00cc66",   # Progress color
+    "exp_bar_bg": "#e5c3cc",   # Background color
 }
 
 THEMES_DIR = resource_path("themes")
@@ -31,6 +33,10 @@ def load_themes():
             json.dump({"Default": DEFAULT_THEME}, f, indent=2)
     with open(THEMES_FILE, "r") as f:
         return json.load(f)
+    for key,default in DEFAULT_THEME.items():
+        if key not in theme or not theme[key]:
+            theme[key] = default
+    return theme
 
 def save_theme(theme_name, theme_dict):
     """
@@ -81,7 +87,8 @@ def open_color_editor(app):
 
     color_keys = [
         "bg_main", "bg_entry", "bg_button", "fg_button",
-        "bg_listbox", "bg_frame", "bg_label", "fg_text"
+        "bg_listbox", "bg_frame", "bg_label", "fg_text",
+        "exp_bar_fg", "exp_bar_bg"
     ]
     color_vars = {k: StringVar(value=theme.get(k, "")) for k in color_keys}
     entries = {}
@@ -113,6 +120,8 @@ def open_color_editor(app):
         row = Frame(editor, bg=theme.get("bg_main", "#ad7b93"))
         row.pack(fill=BOTH, padx=10, pady=5)
         Label(row, text=key, width=12, anchor="w", bg=theme.get("bg_main", "#ad7b93"), font=app.custom_font).pack(side=LEFT)
+        if not color_vars[key].get():
+            color_vars[key].set(DEFAULT_THEME.get(key, "#ffffff"))
         e = Entry(row, textvariable=color_vars[key], width=15, bg=color_vars[key].get(), font=app.custom_font)
         e.pack(side=LEFT, padx=5)
         entries[key] = e

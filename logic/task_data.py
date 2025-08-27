@@ -1,6 +1,6 @@
 import json
 import os
-from datetime import datetime, date
+from datetime import date, datetime
 from tkinter import messagebox, END
 
 DISMISSED_FILE = os.path.join(os.path.expanduser("~"), "Documents", "dismissed_recurring.json")
@@ -44,6 +44,7 @@ def display_tasks_in_listbox(task_file, listbox, date_format, dismissed_today, d
     except (FileNotFoundError, json.JSONDecodeError):
         tasks = []
 
+    today_str = date.today().isoformat()
     for task in tasks:
         recurring_type = task.get("recurring_type", "No")
         indicator = get_recurring_indicator(recurring_type)
@@ -60,10 +61,11 @@ def display_tasks_in_listbox(task_file, listbox, date_format, dismissed_today, d
             display_date = task["date"]  # fallback if parsing fails
 
         display_text = f"{indicator} {task['text']} ({display_date}){due}"
+
         if recurring_type in ["Daily", "Weekly", "Monthly"]:
-            # FIX: Pass the actual task date to should_show_recurring
-            if should_show_recurring(task["text"], recurring_type, check_date=task["date"]):
-                listbox.insert("end", display_text)
+            # Always show recurring tasks for today unless dismissed/completed for today
+            if should_show_recurring(task["text"], recurring_type, check_date=today_str):
+                listbox.insert("end", f"{indicator} {task['text']} ({today_str}){due}")
         else:
             listbox.insert("end", display_text)
 

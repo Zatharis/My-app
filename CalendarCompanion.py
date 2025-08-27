@@ -5,6 +5,7 @@ from datetime import datetime
 import calendar
 from logic.utils import resource_path, load_last_date_format
 from themes.color_manager import load_theme, load_last_theme
+from tkinter import ttk
 
 TASK_FILE = os.path.join(os.path.expanduser("~"), "Documents", "tasks.json")
 COMPLETED_FILE = os.path.join(os.path.expanduser("~"), "Documents", "completed_tasks.json")
@@ -40,6 +41,19 @@ class CalendarApp:
         self.completed_tasks = load_completed_tasks()
         self.dismissed_recurring = load_dismissed_recurring()
         self.date_format = load_last_date_format()
+
+        # --- ttk Style Configuration ---
+        self.style = ttk.Style()
+        self.style.theme_use('default')
+        self.style.configure(
+            "ExpBar.Horizontal.TProgressbar",
+            troughcolor=self.theme.get("bg_entry", "#e5c3cc"),
+            background=self.theme.get("fg_text", "black"),
+            bordercolor=self.theme.get("bg_frame", "#aaaaaa"),
+            lightcolor=self.theme.get("fg_text", "black"),
+            darkcolor=self.theme.get("fg_text", "black"),
+        )
+
         self.create_calendar()
 
     def create_calendar(self):

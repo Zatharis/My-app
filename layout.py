@@ -1,5 +1,5 @@
 from tkinter import *
-from tkinter import ttk, messagebox
+from tkinter import ttk, messagebox, font  # <-- Add 'font' here
 from themes.color_manager import load_themes, load_theme, save_last_theme, load_last_theme
 from logic.task_data import (
     save_task,
@@ -23,30 +23,44 @@ import sys
 
 
 class TaskKeeperApp:
-
-    
     def __init__(self, root):
         self.root = root
-        set_window_icon(self.root)
-        self.style = ttk.Style(self.root)
-        last_theme = load_last_theme()
-        self.theme = load_theme(last_theme)
+
+        # Theme and style
+        self.theme = load_theme(load_last_theme())
+        self.style = ttk.Style()
+        self.style.theme_use('default')
+
+        # Font
+        self.custom_font = font.Font(family="Comic Sans MS", size=12, weight="bold")
+
+        # Date format and string
         self.date_format = load_last_date_format()
-        today = date.today()
-        if self.date_format == "MM-DD-YYYY":
-            self.date_string = today.strftime("%m-%d-%Y")
-        else:
-            self.date_string = today.strftime("%d-%m-%Y")
-        self.custom_font = ("Comic Sans MS", 12)
-        self.recurring_var = StringVar(value="No")
-        self.recurring_type_var = StringVar(value="No")
+        self.date_string = datetime.now().strftime("%m-%d-%Y")
+
+        # Task file paths
         self.task_file = os.path.join(os.path.expanduser("~"), "Documents", "tasks.json")
         self.complete_task_file = os.path.join(os.path.expanduser("~"), "Documents", "completed_tasks.json")
-        self.create_menu()
+
+        # EXP and level
+        self.exp_var = IntVar(value=0)
+        self.level_var = IntVar(value=1)
+
+        # Recurring type variable
+        self.recurring_type_var = StringVar(value="No")  # <-- Add this line
+
+        # Other UI variables (if used)
+        # self.task_listbox = None
+        # self.due_date_frame = None
+        # self.top_frame = None
+        # ... (these will be set in create_widgets)
+
         self.create_widgets()
+        self.create_menu()  
         self.apply_theme()
         self.load_tasks()
-        daily_exp_check(self)  # <-- Add this line
+        if should_run_daily_exp_check():
+            daily_exp_check(self)
         self.load_exp_level()  # Load experience and level on startup
 
     def create_menu(self):
@@ -82,7 +96,7 @@ class TaskKeeperApp:
         devmenu.add_command(label="Save Custom", command=lambda: self.save_custom_theme())
         menubar.add_cascade(label="Developer", menu=devmenu)
 
-        self.root.config(menu=menubar)
+        self.root.config(menu=menubar)  # <-- This attaches the menu bar to the window
 
         # ...existing code...
     
@@ -94,18 +108,60 @@ class TaskKeeperApp:
         self.exp_var = IntVar(value=0)
         self.level_var = IntVar(value=1)
 
-        # Frame for date and exp bar
-        self.top_frame = Frame(self.main_frame, bg=self.theme["bg_frame"])
-        self.top_frame.grid(row=0, column=0, columnspan=3, sticky=W+E, padx=5, pady=5)
+        # Create the top frame for date, exp bar, and level
+        self.top_frame = Frame(
+            self.main_frame,
+            bg=self.theme["bg_frame"],
+            bd=2,
+            relief=GROOVE,
+            height=50
+        )
+        self.top_frame.grid(row=0, column=0, columnspan=2, sticky="ew", padx=5, pady=(5, 0))
+        self.top_frame.grid_propagate(False)
 
-        self.date_label = Label(self.top_frame, text=self.date_string, font=self.custom_font, bg=self.theme["bg_label"])
-        self.date_label.pack(side=LEFT, padx=5)
+        # Do NOT set columnconfigure for self.top_frame, so columns don't expand
 
-        self.exp_bar = ttk.Progressbar(self.top_frame, orient="horizontal", length=200, mode="determinate", variable=self.exp_var, maximum=100)
-        self.exp_bar.pack(side=LEFT, padx=5)
+        self.date_label = Label(
+            self.top_frame,
+            text=self.date_string,
+            font=self.custom_font,
+            bg=self.theme["bg_label"],
+            bd=1,
+            relief=GROOVE
+        )
+        self.date_label.grid(row=0, column=0, padx=5, pady=10, sticky="w")
 
-        self.level_label = Label(self.top_frame, text="Lv. 1", font=self.custom_font, bg=self.theme["bg_label"])
-        self.level_label.pack(side=LEFT, padx=5)
+        self.exp_bar = ttk.Progressbar(
+            self.top_frame,
+            orient="horizontal",
+            length=200,
+            mode="determinate",
+            variable=self.exp_var,
+            maximum=100,
+            style="ExpBar.Horizontal.TProgressbar"
+        )
+        self.exp_bar.grid(row=0, column=1, padx=5, pady=10, sticky="w")
+
+        self.style.configure(
+            "ExpBar.Horizontal.TProgressbar",
+            troughcolor=self.theme.get("exp_bar_bg", "#e5c3cc"),
+            background=self.theme.get("exp_bar_fg", "#00cc66"),
+            bordercolor=self.theme.get("bg_frame", "#aaaaaa"),
+            lightcolor=self.theme.get("exp_bar_fg", "#00cc66"),
+            darkcolor=self.theme.get("exp_bar_fg", "#00cc66"),
+        )
+        self.exp_bar.configure(style="ExpBar.Horizontal.TProgressbar")
+
+        self.level_label = Label(
+            self.top_frame,
+            text=f"Lv. {self.level_var.get()}",
+            font=self.custom_font,
+            bg=self.theme.get("bg_label", "#8a6276"),
+            fg=self.theme.get("fg_text", "black"),
+            bd=1,
+            relief=GROOVE
+        )
+        self.level_label.grid(row=0, column=2, padx=5, pady=10, sticky="w")
 
         # Due date group frame
         self.due_date_frame = Frame(self.main_frame, bg=self.theme["bg_frame"], bd=2, relief=GROOVE)
@@ -220,8 +276,16 @@ class TaskKeeperApp:
             pass
 
         if task_due_date:
-            today_iso = date.today().isoformat()
-            if task_due_date != today_iso:
+            today = date.today()
+            # Try to parse the due date in both possible formats
+            parsed_due = None
+            for fmt in ("%Y-%m-%d", "%m-%d-%Y", "%d-%m-%Y"):
+                try:
+                    parsed_due = datetime.strptime(task_due_date, fmt).date()
+                    break
+                except Exception:
+                    continue
+            if not parsed_due or parsed_due != today:
                 messagebox.showinfo("Not Due Yet", "This task can't be completed until its due date.")
                 return
 
@@ -270,6 +334,20 @@ class TaskKeeperApp:
         self.root.configure(bg=self.theme.get("bg_main", "#ad7b93"))
         self.style.configure("Mainframe.TFrame", background=self.theme.get("bg_main", "#ad7b93"))
         self.main_frame.configure(style="Mainframe.TFrame")
+
+        # --- PATCH: Update progress bar style for live color changes ---
+        self.style.configure(
+            "ExpBar.Horizontal.TProgressbar",
+            troughcolor=self.theme.get("exp_bar_bg", "#e5c3cc"),
+            background=self.theme.get("exp_bar_fg", "#00cc66"),
+            bordercolor=self.theme.get("bg_frame", "#aaaaaa"),
+            lightcolor=self.theme.get("exp_bar_fg", "#00cc66"),
+            darkcolor=self.theme.get("exp_bar_fg", "#00cc66"),
+        )
+        self.exp_bar.configure(style="ExpBar.Horizontal.TProgressbar")
+        # --- END PATCH ---
+
+        self.top_frame.configure(bg=self.theme.get("bg_frame", "#aaaaaa"))  # <-- Add this line
         self.due_date_frame.configure(bg=self.theme.get("bg_frame", "#aaaaaa"))
         self.task_frame.configure(bg=self.theme.get("bg_frame", "#aaaaaa"))
         self.recurring_frame.configure(bg=self.theme.get("bg_frame", "#aaaaaa"))
@@ -284,7 +362,10 @@ class TaskKeeperApp:
         self.delete_button.configure(bg=self.theme.get("bg_button", "#8a6276"), fg=self.theme.get("fg_button", "white"))
         self.dismiss_button.configure(bg=self.theme.get("bg_button", "#8a6276"), fg=self.theme.get("fg_button", "white"))
         self.submit_button.configure(bg=self.theme.get("bg_button", "#8a6276"), fg=self.theme.get("fg_button", "white"))
-        
+        self.level_label.configure(
+            bg=self.theme.get("bg_label", "#8a6276"),
+            fg=self.theme.get("fg_text", "black")
+        )
 
     def select_theme(self, theme_name):
         self.theme = load_theme(theme_name)
@@ -514,4 +595,19 @@ def daily_exp_check(app):
             app.gain_exp(10)
         else:
             app.lose_exp(5)
+
+def should_run_daily_exp_check():
+    check_file = os.path.join(os.path.expanduser("~"), "Documents", "last_exp_check.json")
+    today_str = date.today().isoformat()
+    if os.path.exists(check_file):
+        try:
+            with open(check_file, "r") as f:
+                last_check = json.load(f).get("date")
+            if last_check == today_str:
+                return False  # Already checked today
+        except Exception:
+            pass
+    with open(check_file, "w") as f:
+        json.dump({"date": today_str}, f)
+    return True
 

@@ -4,10 +4,12 @@
     "bg_entry": "#e5c3cc",
     "bg_button": "#8a6276",
     "fg_button": "black",
-    "bg_listbox": "#f5dfe8",
+    "bg_listbox": "#e5c3cc",
     "bg_frame": "#aaaaaa",
     "bg_label": "#8a6276",
-    "fg_text": "black"
+    "fg_text": "black",
+    "exp_bar_fg": "#8a6276",
+    "exp_bar_bg": "#e5c3cc"
   },
   "Tidal Sunset": {
     "bg_main": "#C67148",
@@ -17,7 +19,9 @@
     "bg_listbox": "#D9C68E",
     "bg_frame": "#a7cab1",
     "bg_label": "#2F4858",
-    "fg_text": "#FF4766"
+    "fg_text": "#FF4766",
+    "exp_bar_fg": "#2F4858",
+    "exp_bar_bg": "#D9C68E"
   },
   "Eggplant": {
     "bg_main": "#310A31",
@@ -27,7 +31,9 @@
     "bg_listbox": "#f4ecd6",
     "bg_frame": "#a7cab1",
     "bg_label": "#8a6276",
-    "fg_text": "#5C996E"
+    "fg_text": "#5C996E",
+    "exp_bar_fg": "#5C996E",
+    "exp_bar_bg": "#f4ecd6"
   },
   "Fairy": {
     "bg_main": "#C490D1",
@@ -37,7 +43,9 @@
     "bg_listbox": "#E5FCFF",
     "bg_frame": "#ACACDE",
     "bg_label": "#CF4F84",
-    "fg_text": "#364855"
+    "fg_text": "#364855",
+    "exp_bar_fg": "#364855",
+    "exp_bar_bg": "#E5FCFF"
   },
   "Dark Theme": {
     "bg_main": "#575757",
@@ -47,7 +55,9 @@
     "bg_listbox": "#666666",
     "bg_frame": "#383838",
     "bg_label": "#7A7A7A",
-    "fg_text": "black"
+    "fg_text": "black",
+    "exp_bar_fg": "#004000",
+    "exp_bar_bg": "#666666"
   },
   "Kibi": {
     "bg_main": "#B592A0",
@@ -57,17 +67,21 @@
     "bg_listbox": "#8B1E3F",
     "bg_frame": "#A3C4BC",
     "bg_label": "#3D5467",
-    "fg_text": "#89BD9E"
+    "fg_text": "#89BD9E",
+    "exp_bar_fg": "#89BD9E",
+    "exp_bar_bg": "#8B1E3F"
   },
   "Custom": {
-    "bg_main": "#202020",
-    "bg_entry": "#e7ddbf",
-    "bg_button": "#72717b",
-    "fg_button": "#33ff33",
-    "bg_listbox": "#e7ddbf",
-    "bg_frame": "#403f45",
-    "bg_label": "#72717b",
-    "fg_text": "#33ff33"
+    "bg_main": "#C490D1",
+    "bg_entry": "#E5FCFF",
+    "bg_button": "#CF4F84",
+    "fg_button": "#364855",
+    "bg_listbox": "#E5FCFF",
+    "bg_frame": "#ACACDE",
+    "bg_label": "#CF4F84",
+    "fg_text": "#364855",
+    "exp_bar_fg": "#364855",
+    "exp_bar_bg": "#E5FCFF"
   },
   "Dark Cherry": {
     "bg_main": "#800040",
@@ -77,7 +91,9 @@
     "bg_listbox": "#df0070",
     "bg_frame": "#383838",
     "bg_label": "#b30059",
-    "fg_text": "black"
+    "fg_text": "black",
+    "exp_bar_fg": "#b30059",
+    "exp_bar_bg": "#df0070"
   },
   "Light Theme": {
     "bg_main": "#c0c0c0",
@@ -87,7 +103,9 @@
     "bg_listbox": "#808080",
     "bg_frame": "#3e3e3e",
     "bg_label": "#6b6b6b",
-    "fg_text": "black"
+    "fg_text": "black",
+    "exp_bar_fg": "#6b6b6b",
+    "exp_bar_bg": "#808080"
   },
   "Stormy Blue": {
     "bg_main": "#004040",
@@ -97,7 +115,9 @@
     "bg_listbox": "#408080",
     "bg_frame": "#002828",
     "bg_label": "#008080",
-    "fg_text": "black"
+    "fg_text": "black",
+    "exp_bar_fg": "#008080",
+    "exp_bar_bg": "#408080"
   },
   "Quick Silver": {
     "bg_main": "#ffffff",
@@ -107,7 +127,9 @@
     "bg_listbox": "#c0c0c0",
     "bg_frame": "#808080",
     "bg_label": "#6666ff",
-    "fg_text": "black"
+    "fg_text": "black",
+    "exp_bar_fg": "#6666ff",
+    "exp_bar_bg": "#c0c0c0"
   },
   "Jerimy Dooly": {
     "bg_main": "#400040",
@@ -117,7 +139,9 @@
     "bg_listbox": "#ff8000",
     "bg_frame": "#ff8040",
     "bg_label": "#800080",
-    "fg_text": "black"
+    "fg_text": "black",
+    "exp_bar_fg": "#800080",
+    "exp_bar_bg": "#ff8000"
   },
   "Cauda Acida": {
     "bg_main": "#202020",
@@ -127,7 +151,9 @@
     "bg_listbox": "#e7ddbf",
     "bg_frame": "#403f45",
     "bg_label": "#72717b",
-    "fg_text": "#33ff33"
+    "fg_text": "#33ff33",
+    "exp_bar_fg": "#33ff33",
+    "exp_bar_bg": "#e7ddbf"
   },
   "Spring Willow": {
     "bg_main": "#9dcc50",
@@ -137,7 +163,9 @@
     "bg_listbox": "#f1ffd9",
     "bg_frame": "#579000",
     "bg_label": "#ffeb64",
-    "fg_text": "#ffab94"
+    "fg_text": "#ffab94",
+    "exp_bar_fg": "#ffad94",
+    "exp_bar_bg": "#f1ffd9"
   },
   "Vin": {
     "bg_main": "#110937",
@@ -147,6 +175,8 @@
     "bg_listbox": "#690f96",
     "bg_frame": "#8b14c5",
     "bg_label": "#1bd1cd",
-    "fg_text": "#fcbf43"
+    "fg_text": "#fcbf43",
+    "exp_bar_fg": "#fcbf43",
+    "exp_bar_bg": "#690f96"
   }
 }
