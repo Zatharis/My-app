@@ -527,6 +527,14 @@ class TaskKeeperApp:
 def daily_exp_check(app):
     today = date.today()
     yesterday = today - timedelta(days=1)
+    penalty_file = os.path.join(os.path.expanduser("~"), "Documents", "exp_penalties.json")
+
+    # Load penalty history
+    if os.path.exists(penalty_file):
+        with open(penalty_file, "r") as f:
+            penalties = json.load(f)
+    else:
+        penalties = {}
 
     # Load tasks, completed, and dismissed
     try:
@@ -551,8 +559,15 @@ def daily_exp_check(app):
         if isinstance(entry, dict):
             text = entry.get("text")
             completed_on = entry.get("completed_on") or entry.get("date")
-            if text and completed_on:
-                completed_set.add((text, completed_on))
+            parsed_date = None
+            for fmt in ("%Y-%m-%d", "%m-%d-%Y", "%d-%m-%Y"):
+                try:
+                    parsed_date = datetime.strptime(completed_on, fmt).date()
+                    break
+                except Exception:
+                    continue
+            if text and parsed_date:
+                completed_set.add((text, parsed_date.isoformat()))
 
     dismissed_set = set()
     for key, info in dismissed.items():
@@ -560,9 +575,18 @@ def daily_exp_check(app):
             continue
         text, recurring_type = key.split("|", 1)
         for dismissed_date in info.get("dates", []):
-            dismissed_set.add((text, dismissed_date, recurring_type))
+            parsed_date = None
+            for fmt in ("%Y-%m-%d", "%m-%d-%Y", "%d-%m-%Y"):
+                try:
+                    parsed_date = datetime.strptime(dismissed_date, fmt).date()
+                    break
+                except Exception:
+                    continue
+            if parsed_date:
+                dismissed_set.add((text, parsed_date.isoformat(), recurring_type))
 
-    # Check yesterday's tasks
+    # Only check yesterday's tasks
+    yesterday_iso = yesterday.isoformat()
     for task in tasks:
         text = task.get("text")
         recurring_type = task.get("recurring_type", "No")
@@ -574,8 +598,14 @@ def daily_exp_check(app):
         # If due date is in the future, skip
         if due:
             try:
-                due_date = datetime.strptime(due, "%Y-%m-%d").date()
-                if due_date > yesterday:
+                due_date = None
+                for fmt in ("%Y-%m-%d", "%m-%d-%Y", "%d-%m-%Y"):
+                    try:
+                        due_date = datetime.strptime(due, fmt).date()
+                        break
+                    except Exception:
+                        continue
+                if due_date and due_date > yesterday:
                     continue
             except Exception:
                 pass
@@ -583,18 +613,34 @@ def daily_exp_check(app):
         # If task was created after yesterday, skip
         if created:
             try:
-                created_date = datetime.strptime(created, "%Y-%m-%d").date()
-                if created_date > yesterday:
+                created_date = None
+                for fmt in ("%Y-%m-%d", "%m-%d-%Y", "%d-%m-%Y"):
+                    try:
+                        created_date = datetime.strptime(created, fmt).date()
+                        break
+                    except Exception:
+                        continue
+                if created_date and created_date > yesterday:
                     continue
             except Exception:
                 pass
 
+        penalty_key = f"{text}|{recurring_type}|{yesterday_iso}"
+
         # If completed or dismissed yesterday, gain exp
-        if (text, yesterday.strftime("%Y-%m-%d")) in completed_set or \
-           (text, yesterday.strftime("%Y-%m-%d"), recurring_type) in dismissed_set:
+        if (text, yesterday_iso) in completed_set or \
+           (text, yesterday_iso, recurring_type) in dismissed_set:
             app.gain_exp(10)
         else:
-            app.lose_exp(5)
+            # Only penalize if not already penalized for this task/date
+            if not penalties.get(penalty_key):
+                print(f"Lost exp for: {text} ({recurring_type}) on {yesterday_iso}")
+                app.lose_exp(5)
+                penalties[penalty_key] = True
+
+    # Save updated penalties
+    with open(penalty_file, "w") as f:
+        json.dump(penalties, f)
 
 def should_run_daily_exp_check():
     check_file = os.path.join(os.path.expanduser("~"), "Documents", "last_exp_check.json")
