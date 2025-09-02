@@ -478,28 +478,46 @@ class TaskKeeperApp:
         calendar_path = os.path.join(os.path.dirname(__file__), "CalendarCompanion.py")
         subprocess.Popen([sys.executable, calendar_path])
 
+    def exp_to_level(self, level):
+        # Progressive curve: +10 per level, cap at 400 at level 30+
+        if level < 30:
+            return 100 + (level - 1) * 10
+        else:
+            return 400
+
     def gain_exp(self, amount):
-        exp = self.exp_var.get() + amount
+        exp = self.exp_var.get()
         level = self.level_var.get()
-        while exp >= 100 and level < 99:
-            exp -= 100
-            level += 1
+        while amount > 0 and level < 99:
+            needed = self.exp_to_level(level) - exp
+            if amount >= needed:
+                amount -= needed
+                level += 1
+                exp = 0
+            else:
+                exp += amount
+                amount = 0
         self.exp_var.set(exp)
         self.level_var.set(level)
         self.level_label.config(text=f"Lv. {level}")
-        self.save_exp_level()  # Save experience and level whenever they change
+        self.save_exp_level()
 
     def lose_exp(self, amount):
-        exp = self.exp_var.get() - amount
+        exp = self.exp_var.get()
         level = self.level_var.get()
-        while exp < 0 and level > 1:
-            exp += 100
-            level -= 1
+        while amount > 0 and level > 1:
+            if exp >= amount:
+                exp -= amount
+                amount = 0
+            else:
+                amount -= exp
+                level -= 1
+                exp = self.exp_to_level(level)
         exp = max(exp, 0)
         self.exp_var.set(exp)
         self.level_var.set(level)
         self.level_label.config(text=f"Lv. {level}")
-        self.save_exp_level()  # Save experience and level whenever they change
+        self.save_exp_level()
 
     def save_exp_level(self):
         data = {
