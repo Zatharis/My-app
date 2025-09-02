@@ -108,6 +108,8 @@ def delete_task_from_file(task_file, complete_task_file, task_text, date_string,
         })
         with open(complete_task_file, "w") as f:
             json.dump(completed, f, indent=2)
+        return True
+    return False
 
 def load_completed_tasks(file_path):
     """
