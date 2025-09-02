@@ -179,14 +179,16 @@ class CalendarApp:
                 elif recurring_type == "Monthly" and parsed:
                     if day == parsed.day:
                         show_task = True
-                elif recurring_type == "No" and parsed and parsed.day == day and parsed.month == now.month:
-                    show_task = True
+                elif recurring_type == "No" and parsed:
+                    if parsed.day == day and parsed.month == now.month:
+                        show_task = True
 
                 # Only show tasks that were created on or before this date
                 created_date = parse_date(task.get("date", ""), self.date_format)
                 if show_task and created_date and created_date > current_date:
                     show_task = False
 
+                # PATCH: Hide if completed or dismissed for this day
                 if show_task and recurring_type in ["Daily", "Weekly", "Monthly"]:
                     if (task["text"], current_date_str) in completed_set:
                         show_task = False
