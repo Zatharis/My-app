@@ -25,6 +25,7 @@ import sys
 class TaskKeeperApp:
     def __init__(self, root):
         self.root = root
+        self.calendar_process = None  # <-- Add this line
 
         # Theme and style
         self.theme = load_theme(load_last_theme())
@@ -62,6 +63,7 @@ class TaskKeeperApp:
         if should_run_daily_exp_check():
             daily_exp_check(self)
         self.load_exp_level()  # Load experience and level on startup
+        self.root.protocol("WM_DELETE_WINDOW", self.on_close)  # <-- Add this line
 
     def create_menu(self):
         menubar = Menu(self.root)
@@ -103,9 +105,7 @@ class TaskKeeperApp:
         menubar.add_cascade(label="Developer", menu=devmenu)
 
         self.root.config(menu=menubar)  # <-- This attaches the menu bar to the window
-
-        
-    
+  
     def create_widgets(self):
         self.main_frame = ttk.Frame(self.root, style="Mainframe.TFrame")
         self.main_frame.pack(fill=BOTH, expand=True, padx=10, pady=10)
@@ -474,9 +474,15 @@ class TaskKeeperApp:
         display_tasks_in_listbox(self.task_file, self.task_listbox, self.date_format, dismissed_today, displayed_today)
 
     def launch_calendar(self):
-        # Use sys.executable to ensure the same Python interpreter is used
         calendar_path = os.path.join(os.path.dirname(__file__), "CalendarCompanion.py")
-        subprocess.Popen([sys.executable, calendar_path])
+        if self.calendar_process is None or self.calendar_process.poll() is not None:
+            self.calendar_process = subprocess.Popen([sys.executable, calendar_path])
+
+    def on_close(self):
+        # Close calendar if open
+        if self.calendar_process and self.calendar_process.poll() is None:
+            self.calendar_process.terminate()
+        self.root.destroy()
 
     def exp_to_level(self, level):
         # Progressive curve: +10 per level, cap at 400 at level 30+
@@ -551,7 +557,6 @@ def daily_exp_check(app):
     yesterday = today - timedelta(days=1)
     yesterday_str = format_date(yesterday, app.date_format)
 
-    # Load penalty history
     penalty_file = os.path.join(os.path.expanduser("~"), "Documents", "exp_penalties.json")
     if os.path.exists(penalty_file):
         with open(penalty_file, "r") as f:
@@ -604,9 +609,8 @@ def daily_exp_check(app):
 
         # Only check recurring tasks that should have appeared yesterday
         if recurring_type in ["Daily", "Weekly", "Monthly"]:
-            # Use should_show_recurring to check if the task was active yesterday
             if not should_show_recurring(text, recurring_type, app.date_format, check_date=yesterday_str):
-                continue  # Skip penalty if the task was not present yesterday
+                continue
 
         # If due date is in the future, skip
         if due:
@@ -621,8 +625,9 @@ def daily_exp_check(app):
         if created:
             try:
                 created_date = parse_date(created, app.date_format)
-                if created_date and created_date.date() > yesterday:
-                    continue
+                # PATCH: Only penalize if task was created on or before yesterday
+                if created_date and created_date.date() < (date.today() - timedelta(days=1)):
+                    continue  # Skip penalty for tasks older than a day ago
             except Exception:
                 pass
 
@@ -632,7 +637,10 @@ def daily_exp_check(app):
         if (text, yesterday_str) in completed_set or (text, yesterday_str, recurring_type) in dismissed_set:
             app.gain_exp(10)
         else:
-            app.lose_exp(5)
+            # Only penalize if not already penalized for this task/date
+            if not penalties.get(penalty_key):
+                app.lose_exp(5)
+                penalties[penalty_key] = True
 
     # Save updated penalties
     with open(penalty_file, "w") as f:
