@@ -171,12 +171,12 @@
     "bg_main": "#110937",
     "bg_entry": "#690f96",
     "bg_button": "#1bd1cd",
-    "fg_button": "#fcbf43",
+    "fg_button": "#e39b04",
     "bg_listbox": "#690f96",
     "bg_frame": "#8b14c5",
     "bg_label": "#1bd1cd",
-    "fg_text": "#fcbf43",
-    "exp_bar_fg": "#fcbf43",
+    "fg_text": "#e39b04",
+    "exp_bar_fg": "#e39b04",
     "exp_bar_bg": "#690f96"
   }
 }
