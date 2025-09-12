@@ -2,6 +2,7 @@ import os
 import sys
 from tkinter import PhotoImage
 import json
+from datetime import datetime
 
 def resource_path(relative_path):
     """
@@ -47,3 +48,28 @@ def load_last_date_format():
         except Exception:
             pass
     return "MM-DD-YYYY"
+
+DATE_FORMATS = {
+    "MM-DD-YYYY": "%m-%d-%Y",
+    "DD-MM-YYYY": "%d-%m-%Y",
+    "YYYY-MM-DD": "%Y-%m-%d",
+    "YYYY-DD-MM": "%Y-%d-%m"
+}
+
+def format_date(dt, fmt_name):
+    fmt = DATE_FORMATS.get(fmt_name, "%m-%d-%Y")
+    return dt.strftime(fmt)
+
+def parse_date(date_str, fmt_name):
+    # Try user format first, then all formats
+    fmts = [DATE_FORMATS.get(fmt_name, "%m-%d-%Y")] + list(DATE_FORMATS.values())
+    for fmt in fmts:
+        try:
+            return datetime.strptime(date_str, fmt)
+        except Exception:
+            continue
+    # Fallback: try ISO
+    try:
+        return datetime.strptime(date_str, "%Y-%m-%d")
+    except Exception:
+        return None

@@ -3,7 +3,7 @@ import json
 from tkinter import Tk, Frame, Label, BOTH, Canvas, Scrollbar, Button
 from datetime import datetime
 import calendar
-from logic.utils import resource_path, load_last_date_format
+from logic.utils import format_date, parse_date, load_last_date_format
 from themes.color_manager import load_theme, load_last_theme
 from tkinter import ttk
 
@@ -92,7 +92,7 @@ class CalendarApp:
 
         month_label = Label(
             month_frame,
-            text=now.strftime("%B %Y"),
+            text=format_date(now, self.date_format),
             font=("Comic Sans MS", 14, "bold"),
             bg=self.theme["bg_label"],
             fg=self.theme["fg_text"],
@@ -163,18 +163,12 @@ class CalendarApp:
             ).pack(padx=2, pady=2)
 
             current_date = datetime(now.year, now.month, day)
-            current_date_str = current_date.strftime("%Y-%m-%d")
+            current_date_str = format_date(current_date, self.date_format)
 
             for task in self.tasks:
                 show_date = task.get("due") or task.get("date")
                 recurring_type = task.get("recurring_type", "No")
-                parsed = None
-                for fmt in ("%Y-%m-%d", parse_fmt):
-                    try:
-                        parsed = datetime.strptime(show_date, fmt)
-                        break
-                    except Exception:
-                        continue
+                parsed = parse_date(show_date, self.date_format)
 
                 show_task = False
                 if recurring_type == "Daily":
@@ -188,13 +182,10 @@ class CalendarApp:
                 elif recurring_type == "No" and parsed and parsed.day == day and parsed.month == now.month:
                     show_task = True
 
-                # New date comparison logic
-                today = datetime.now()
-                if show_task and current_date < today.replace(hour=0, minute=0, second=0, microsecond=0):
-                    # Only show tasks that were created on or before this date
-                    created_date = datetime.strptime(task.get("date", ""), "%Y-%m-%d")
-                    if created_date > current_date:
-                        show_task = False  # Skip tasks created after this day
+                # Only show tasks that were created on or before this date
+                created_date = parse_date(task.get("date", ""), self.date_format)
+                if show_task and created_date and created_date > current_date:
+                    show_task = False
 
                 if show_task and recurring_type in ["Daily", "Weekly", "Monthly"]:
                     if (task["text"], current_date_str) in completed_set:
@@ -227,18 +218,12 @@ class CalendarApp:
         canvas.create_window((0, 0), window=inner_frame, anchor="nw")
 
         current_date = datetime(now.year, now.month, day)
-        current_date_str = current_date.strftime("%Y-%m-%d")
+        current_date_str = format_date(current_date, self.date_format)
 
         for task in self.tasks:
             show_date = task.get("due") or task.get("date")
             recurring_type = task.get("recurring_type", "No")
-            parsed = None
-            for fmt in ("%Y-%m-%d", parse_fmt):
-                try:
-                    parsed = datetime.strptime(show_date, fmt)
-                    break
-                except Exception:
-                    continue
+            parsed = parse_date(show_date, self.date_format)
 
             show_task = False
             if recurring_type == "Daily":

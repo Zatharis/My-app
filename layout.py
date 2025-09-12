@@ -12,7 +12,7 @@ from logic.task_data import (
     load_tasks,
     display_tasks_in_listbox,
 )
-from logic.utils import set_window_icon, load_last_date_format, save_last_date_format
+from logic.utils import set_window_icon, load_last_date_format, save_last_date_format, parse_date, format_date
 from ui.ui_elements import create_entry, create_button, create_listbox, create_scrollbar, create_dropdown
 import os
 from datetime import date, datetime, timedelta
@@ -74,11 +74,17 @@ class TaskKeeperApp:
         # --- View menu ---
         viewmenu = Menu(menubar, tearoff=0)
         viewmenu.add_command(label="Completed Tasks", command=self.show_completed_tasks)
-        viewmenu.add_command(label="Swap Date Format", command=self.swap_date_format)
+        #viewmenu.add_command(label="Swap Date Format", command=self.swap_date_format)
         viewmenu.add_command(label="Open Calendar", command=self.launch_calendar)  # <-- Add this line
         menubar.add_cascade(label="View", menu=viewmenu)
 
-        
+        dateformatmenu = Menu(menubar, tearoff=0)
+        for fmt in ["MM-DD-YYYY", "DD-MM-YYYY", "YYYY-MM-DD", "YYYY-DD-MM"]:
+            dateformatmenu.add_command(
+                label=fmt,
+                command=lambda f=fmt: self.set_date_format(f)
+            )
+        menubar.add_cascade(label="Date Format", menu=dateformatmenu)
 
         # --- Themes menu (for picking themes only) ---
         themesmenu = Menu(menubar, tearoff=0)
@@ -98,7 +104,7 @@ class TaskKeeperApp:
 
         self.root.config(menu=menubar)  # <-- This attaches the menu bar to the window
 
-        # ...existing code...
+        
     
     def create_widgets(self):
         self.main_frame = ttk.Frame(self.root, style="Mainframe.TFrame")
@@ -222,14 +228,15 @@ class TaskKeeperApp:
     def get_task(self):
         task_text = self.task_entry.get().strip()
         due_date = self.due_entry.get().strip()
-        recurring_type = self.recurring_type_var.get()  # "No", "Daily", "Weekly", "Monthly"
+        recurring_type = self.recurring_type_var.get()
         recurring = recurring_type != "No"
 
         if not task_text:
             messagebox.showwarning("Input Error", "Please enter a task")
             return
 
-        iso_date = date.today().isoformat()  # Default to today's date if no due date is provided
+        # Use the user's format for today's date
+        iso_date = format_date(date.today(), self.date_format)
         task_data = {
             "text": task_text,
             "date": iso_date,
@@ -253,8 +260,6 @@ class TaskKeeperApp:
         self.task_listbox.delete(0, END)
         self.load_tasks()
 
-
-
     def delete_task(self):
         selected_index = self.task_listbox.curselection()
         if not selected_index:
@@ -277,19 +282,12 @@ class TaskKeeperApp:
 
         if task_due_date:
             today = date.today()
-            # Try to parse the due date in both possible formats
-            parsed_due = None
-            for fmt in ("%Y-%m-%d", "%m-%d-%Y", "%d-%m-%Y"):
-                try:
-                    parsed_due = datetime.strptime(task_due_date, fmt).date()
-                    break
-                except Exception:
-                    continue
-            if not parsed_due or parsed_due != today:
+            parsed_due = parse_date(task_due_date, self.date_format)
+            if not parsed_due or parsed_due.date() != today:
                 messagebox.showinfo("Not Due Yet", "This task can't be completed until its due date.")
                 return
 
-        delete_task_from_file(self.task_file, self.complete_task_file, task_text, self.date_string)
+        delete_task_from_file(self.task_file, self.complete_task_file, task_text, self.date_string, self.date_format)
         self.task_listbox.delete(selected_index)
         self.gain_exp(10)
 
@@ -301,7 +299,7 @@ class TaskKeeperApp:
         display_text = self.task_listbox.get(selected_index)
         recurring_type = self.get_recurring_type(display_text)
         task_text = self.extract_task_text(display_text)
-        dismiss_recurring_task(task_text, recurring_type)
+        dismiss_recurring_task(task_text, recurring_type, self.date_format)
         self.task_listbox.delete(selected_index)
         self.gain_exp(5)
 
@@ -386,15 +384,8 @@ class TaskKeeperApp:
             if isinstance(task, dict):
                 text = task.get("text", "")
                 completed_on = task.get("completed_on", "")
-                #format the date for display
-                try:
-                    dt = datetime.strptime(completed_on, "%Y-%m-%d")
-                    if self.date_format == "MM-DD-YYYY":
-                        display_date = dt.strftime("%m-%d-%Y")
-                    else:
-                        display_date = dt.strftime("%d-%m-%Y")
-                except Exception:
-                    display_date = completed_on
+                dt = parse_date(completed_on, self.date_format)
+                display_date = format_date(dt, self.date_format) if dt else completed_on
                 display = f"{text} (Completed on: {display_date})"
                 listbox.insert(END, display)
             else:
@@ -436,26 +427,39 @@ class TaskKeeperApp:
         window.grab_set()
         window.wait_window()
 
-    def swap_date_format(self):
+    #def swap_date_format(self):
         # Toggle between two formats
-        if self.date_format == "MM-DD-YYYY":
-            self.date_format = "DD-MM-YYYY"
-        else:
-            self.date_format = "MM-DD-YYYY"
+        #if self.date_format == "MM-DD-YYYY":
+            #self.date_format = "DD-MM-YYYY"
+        #else:
+            #self.date_format = "MM-DD-YYYY"
 
         # Update the displayed date string
-        today = datetime.today()
-        if self.date_format == "MM-DD-YYYY":
-            self.date_string = today.strftime("%m-%d-%Y")
-        else:
-            self.date_string = today.strftime("%d-%m-%Y")
+        #today = datetime.today()
+        #if self.date_format == "MM-DD-YYYY":
+            #self.date_string = today.strftime("%m-%d-%Y")
+        #else:
+            #self.date_string = today.strftime("%d-%m-%Y")
 
         # Update the date label if it exists
+        #if hasattr(self, "date_label"):
+            #self.date_label.config(text=self.date_string)
+        #if hasattr(self, "due_label"):
+            #self.due_label.config(text=self.get_due_label_text())
+        #save_last_date_format(self.date_format)
+        #self.load_tasks()
+
+    def set_date_format(self, fmt):
+        self.date_format = fmt
+        from logic.utils import save_last_date_format
+        save_last_date_format(fmt)
+        # Update all date displays
+        today = datetime.today()
+        self.date_string = format_date(today, self.date_format)
         if hasattr(self, "date_label"):
             self.date_label.config(text=self.date_string)
         if hasattr(self, "due_label"):
-            self.due_label.config(text=self.get_due_label_text())
-        save_last_date_format(self.date_format)
+            self.due_label.config(text=f"Due Date ({self.date_format}):")
         self.load_tasks()
 
     def get_due_label_text(self):
@@ -527,9 +531,10 @@ class TaskKeeperApp:
 def daily_exp_check(app):
     today = date.today()
     yesterday = today - timedelta(days=1)
-    penalty_file = os.path.join(os.path.expanduser("~"), "Documents", "exp_penalties.json")
+    yesterday_str = format_date(yesterday, app.date_format)
 
     # Load penalty history
+    penalty_file = os.path.join(os.path.expanduser("~"), "Documents", "exp_penalties.json")
     if os.path.exists(penalty_file):
         with open(penalty_file, "r") as f:
             penalties = json.load(f)
@@ -553,21 +558,16 @@ def daily_exp_check(app):
     except Exception:
         dismissed = {}
 
-    # Build lookup sets
+    # Build lookup sets using user format
+    from logic.utils import parse_date
+
     completed_set = set()
     for entry in completed:
         if isinstance(entry, dict):
             text = entry.get("text")
-            completed_on = entry.get("completed_on") or entry.get("date")
-            parsed_date = None
-            for fmt in ("%Y-%m-%d", "%m-%d-%Y", "%d-%m-%Y"):
-                try:
-                    parsed_date = datetime.strptime(completed_on, fmt).date()
-                    break
-                except Exception:
-                    continue
-            if text and parsed_date:
-                completed_set.add((text, parsed_date.isoformat()))
+            completed_on = entry.get("completed_on")
+            if text and completed_on:
+                completed_set.add((text, completed_on))
 
     dismissed_set = set()
     for key, info in dismissed.items():
@@ -575,37 +575,26 @@ def daily_exp_check(app):
             continue
         text, recurring_type = key.split("|", 1)
         for dismissed_date in info.get("dates", []):
-            parsed_date = None
-            for fmt in ("%Y-%m-%d", "%m-%d-%Y", "%d-%m-%Y"):
-                try:
-                    parsed_date = datetime.strptime(dismissed_date, fmt).date()
-                    break
-                except Exception:
-                    continue
-            if parsed_date:
-                dismissed_set.add((text, parsed_date.isoformat(), recurring_type))
+            dismissed_set.add((text, dismissed_date, recurring_type))
 
     # Only check yesterday's tasks
-    yesterday_iso = yesterday.isoformat()
     for task in tasks:
         text = task.get("text")
         recurring_type = task.get("recurring_type", "No")
         due = task.get("due")
         created = task.get("date")
-        if recurring_type not in ["Daily", "Weekly", "Monthly"]:
-            continue
+
+        # Only check recurring tasks that should have appeared yesterday
+        if recurring_type in ["Daily", "Weekly", "Monthly"]:
+            # Use should_show_recurring to check if the task was active yesterday
+            if not should_show_recurring(text, recurring_type, app.date_format, check_date=yesterday_str):
+                continue  # Skip penalty if the task was not present yesterday
 
         # If due date is in the future, skip
         if due:
             try:
-                due_date = None
-                for fmt in ("%Y-%m-%d", "%m-%d-%Y", "%d-%m-%Y"):
-                    try:
-                        due_date = datetime.strptime(due, fmt).date()
-                        break
-                    except Exception:
-                        continue
-                if due_date and due_date > yesterday:
+                due_date = parse_date(due, app.date_format)
+                if due_date and due_date.date() > yesterday:
                     continue
             except Exception:
                 pass
@@ -613,30 +602,19 @@ def daily_exp_check(app):
         # If task was created after yesterday, skip
         if created:
             try:
-                created_date = None
-                for fmt in ("%Y-%m-%d", "%m-%d-%Y", "%d-%m-%Y"):
-                    try:
-                        created_date = datetime.strptime(created, fmt).date()
-                        break
-                    except Exception:
-                        continue
-                if created_date and created_date > yesterday:
+                created_date = parse_date(created, app.date_format)
+                if created_date and created_date.date() > yesterday:
                     continue
             except Exception:
                 pass
 
-        penalty_key = f"{text}|{recurring_type}|{yesterday_iso}"
+        penalty_key = f"{text}|{recurring_type}|{yesterday_str}"
 
         # If completed or dismissed yesterday, gain exp
-        if (text, yesterday_iso) in completed_set or \
-           (text, yesterday_iso, recurring_type) in dismissed_set:
+        if (text, yesterday_str) in completed_set or (text, yesterday_str, recurring_type) in dismissed_set:
             app.gain_exp(10)
         else:
-            # Only penalize if not already penalized for this task/date
-            if not penalties.get(penalty_key):
-                print(f"Lost exp for: {text} ({recurring_type}) on {yesterday_iso}")
-                app.lose_exp(5)
-                penalties[penalty_key] = True
+            app.lose_exp(5)
 
     # Save updated penalties
     with open(penalty_file, "w") as f:

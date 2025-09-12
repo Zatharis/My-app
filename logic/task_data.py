@@ -2,6 +2,7 @@ import json
 import os
 from datetime import date, datetime
 from tkinter import messagebox, END
+from logic.utils import format_date, parse_date
 
 DISMISSED_FILE = os.path.join(os.path.expanduser("~"), "Documents", "dismissed_recurring.json")
 
@@ -44,19 +45,21 @@ def display_tasks_in_listbox(task_file, listbox, date_format, dismissed_today, d
     except (FileNotFoundError, json.JSONDecodeError):
         tasks = []
 
-    today_str = date.today().isoformat()
+    today_str = format_date(date.today(), date_format)
     for task in tasks:
+        show_date = task.get("due") or task.get("date")
+        parsed = parse_date(show_date, date_format)
         recurring_type = task.get("recurring_type", "No")
         indicator = get_recurring_indicator(recurring_type)
         due = f" | Due: {task['due']}" if task.get("due") else ""
 
         # Format the date for display
         try:
-            dt = datetime.strptime(task["date"], "%Y-%m-%d")
-            if date_format == "MM-DD-YYYY":
-                display_date = dt.strftime("%m-%d-%Y")
+            dt = parse_date(task["date"], date_format)
+            if dt:
+                display_date = format_date(dt, date_format)
             else:
-                display_date = dt.strftime("%d-%m-%Y")
+                display_date = task["date"]  # fallback if parsing fails
         except Exception:
             display_date = task["date"]  # fallback if parsing fails
 
@@ -64,7 +67,7 @@ def display_tasks_in_listbox(task_file, listbox, date_format, dismissed_today, d
 
         if recurring_type in ["Daily", "Weekly", "Monthly"]:
             # Always show recurring tasks for today unless dismissed/completed for today
-            if should_show_recurring(task["text"], recurring_type, check_date=today_str):
+            if should_show_recurring(task["text"], recurring_type, date_format, check_date=today_str):
                 listbox.insert("end", f"{indicator} {task['text']} ({today_str}){due}")
         else:
             listbox.insert("end", display_text)
@@ -74,7 +77,7 @@ def display_tasks_in_listbox(task_file, listbox, date_format, dismissed_today, d
     displayed_today = set()
     
 
-def delete_task_from_file(task_file, complete_task_file, task_text, date_string):
+def delete_task_from_file(task_file, complete_task_file, task_text, date_string, date_format):
     try:
         with open(task_file, "r") as f:
             tasks = json.load(f)
@@ -101,7 +104,7 @@ def delete_task_from_file(task_file, complete_task_file, task_text, date_string)
             "date": deleted_task.get("date"),
             "due": deleted_task.get("due"),
             "recurring_type": deleted_task.get("recurring_type", "No"),
-            "completed_on": datetime.today().strftime("%Y-%m-%d")  # <-- ISO format!
+            "completed_on": format_date(date.today(), date_format)  # Use user format
         })
         with open(complete_task_file, "w") as f:
             json.dump(completed, f, indent=2)
@@ -133,28 +136,24 @@ def save_dismissed_recurring(dismissed):
     with open(DISMISSED_FILE, "w") as f:
         json.dump(dismissed, f, indent=2)
 
-def dismiss_recurring_task(task_text, recurring_type):
-    """
-    Dismiss a recurring task for a specific day.
-    Stores a list of dismissed dates for each task+type.
-    """
+def dismiss_recurring_task(task_text, recurring_type, date_format, dismiss_date=None):
     dismissed = load_dismissed_recurring()
-    today = datetime.today().strftime("%Y-%m-%d")
+    if dismiss_date is None:
+        dismiss_date = date.today()
+    dismiss_str = format_date(dismiss_date, date_format)
     key = f"{task_text}|{recurring_type}"
-    # Always ensure 'dates' is a list
     if key not in dismissed:
         dismissed[key] = {"dates": [], "type": recurring_type}
     if "dates" not in dismissed[key] or not isinstance(dismissed[key]["dates"], list):
         dismissed[key]["dates"] = []
-    if today not in dismissed[key]["dates"]:
-        dismissed[key]["dates"].append(today)
+    if dismiss_str not in dismissed[key]["dates"]:
+        dismissed[key]["dates"].append(dismiss_str)
     save_dismissed_recurring(dismissed)
 
-def should_show_recurring(task_text, recurring_type, check_date=None):
+def should_show_recurring(task_text, recurring_type, date_format, check_date=None):
     """
-    Determine if a recurring task should be shown, based on its dismissal and type.
-    Uses a composite key to match the correct recurrence.
-    If check_date is None, uses today.
+    Returns True if the recurring task should be shown on the given date,
+    and False if it was dismissed for that date.
     """
     dismissed = load_dismissed_recurring()
     key = f"{task_text}|{recurring_type}"
@@ -162,9 +161,25 @@ def should_show_recurring(task_text, recurring_type, check_date=None):
     if not info or info.get("type") != recurring_type:
         return True
 
+    # Determine which date to check
     if check_date is None:
-        check_date = datetime.today().strftime("%Y-%m-%d")
-    return check_date not in info.get("dates", [])
+        check_date = format_date(date.today(), date_format)
+    else:
+        # If check_date is a datetime/date object, format it
+        if isinstance(check_date, (datetime, date)):
+            check_date = format_date(check_date, date_format)
+
+    # If the date is in the dismissed list, do not show
+    dismissed_dates = info.get("dates", [])
+    # Normalize all dismissed dates to the current format for comparison
+    normalized_dismissed = set()
+    for d in dismissed_dates:
+        parsed = parse_date(d, date_format)
+        if parsed:
+            normalized_dismissed.add(format_date(parsed, date_format))
+        else:
+            normalized_dismissed.add(d)
+    return check_date not in normalized_dismissed
 
 def load_tasks(task_file):
     if not os.path.exists(task_file):
