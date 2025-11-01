@@ -105,26 +105,56 @@ class CalendarApp:
         calendar_frame.pack(fill=BOTH, expand=True)
 
         # --- Make the grid stretch ---
-        for row in range(6):  # Up to 6 weeks in a month
+        for row in range(7):  # 6 weeks + header row
             calendar_frame.rowconfigure(row, weight=1)
         for col in range(7):  # 7 days per week
             calendar_frame.columnconfigure(col, weight=1)
+
+        # --- Add day-of-week headers ---
+        days_of_week = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"]
+        for col, day_name in enumerate(days_of_week):
+            Label(
+                calendar_frame,
+                text=day_name,
+                font=("Comic Sans MS", 12, "bold"),
+                bg=self.theme["bg_label"],
+                fg=self.theme["fg_text"],
+                borderwidth=1,
+                relief="ridge"
+            ).grid(row=0, column=col, sticky="nsew", padx=1, pady=1)
 
         if self.date_format == "MM-DD-YYYY":
             parse_fmt = "%m-%d-%Y"
         else:
             parse_fmt = "%d-%m-%Y"
 
+        first_weekday, _ = calendar.monthrange(now.year, now.month)
         for day in range(1, days_in_month + 1):
+            current_date = datetime(now.year, now.month, day)
+            is_today = (current_date.date() == datetime.now().date())
+            cell_border = self.theme["bg_label"] if is_today else self.theme["bg_frame"]
+
+            # PATCH: Calculate correct row and column for the calendar grid
+            # first_weekday: 0=Monday, 6=Sunday (Python's calendar module)
+            # We want columns: 0=Sunday, 1=Monday, ..., 6=Saturday
+            # So shift first_weekday to Sunday=0
+            python_first_weekday = first_weekday  # 0=Monday
+            # Calculate the weekday for the first day of the month (0=Monday, 6=Sunday)
+            # To shift so Sunday=0, use:
+            sunday_first_weekday = (python_first_weekday + 1) % 7
+            # Now, for each day:
+            col = (sunday_first_weekday + day - 1) % 7
+            row = (sunday_first_weekday + day - 1) // 7 + 1  # +1 for header row
+
             cell_frame = Frame(
                 calendar_frame,
                 bg=self.theme["bg_entry"],
-                borderwidth=2,
-                relief="groove",
-                highlightbackground=self.theme["bg_frame"],
-                highlightcolor=self.theme["bg_frame"]
+                borderwidth=3 if is_today else 2,
+                relief="solid" if is_today else "groove",
+                highlightbackground=cell_border,
+                highlightcolor=cell_border
             )
-            cell_frame.grid(row=(day-1)//7, column=(day-1)%7, padx=2, pady=2, sticky="nsew")
+            cell_frame.grid(row=row, column=col, padx=2, pady=2, sticky="nsew")
 
             canvas_height = 100
             canvas = Canvas(cell_frame, bg=self.theme["bg_entry"], highlightthickness=0, height=canvas_height)
@@ -162,7 +192,6 @@ class CalendarApp:
                 command=lambda d=day: self.show_day_tasks(d, now, completed_set, dismissed_set, parse_fmt)
             ).pack(padx=2, pady=2)
 
-            current_date = datetime(now.year, now.month, day)
             current_date_str = format_date(current_date, self.date_format)
 
             for task in self.tasks:

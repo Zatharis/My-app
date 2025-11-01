@@ -18,8 +18,9 @@ import os
 from datetime import date, datetime, timedelta
 import json
 from themes.color_manager import open_color_editor, save_theme
-import subprocess
 import sys
+import subprocess
+
 
 
 class TaskKeeperApp:
@@ -268,7 +269,7 @@ class TaskKeeperApp:
         display_text = self.task_listbox.get(selected_index)
         task_text = self.extract_task_text(display_text)
 
-        # Before deleting:
+        # Find the task and its due date
         task_due_date = None
         try:
             with open(self.task_file, "r") as f:
@@ -280,16 +281,32 @@ class TaskKeeperApp:
         except Exception:
             pass
 
+        today = date.today()
+        parsed_due = None
         if task_due_date:
-            today = date.today()
-            parsed_due = parse_date(task_due_date, self.date_format)
-            if not parsed_due or parsed_due.date() != today:
-                messagebox.showinfo("Not Due Yet", "This task can't be completed until its due date.")
-                return
+            for fmt in ("%Y-%m-%d", "%m-%d-%Y", "%d-%m-%Y"):
+                try:
+                    parsed_due = datetime.strptime(task_due_date, fmt).date()
+                    break
+                except Exception:
+                    continue
 
-        delete_task_from_file(self.task_file, self.complete_task_file, task_text, self.date_string, self.date_format)
-        self.task_listbox.delete(selected_index)
-        self.gain_exp(10)
+        # Only allow deletion if due date is today or in the past
+        if parsed_due and parsed_due > today:
+            messagebox.showinfo("Not Due Yet", "This task can't be completed until its due date.")
+            return
+
+        # Actually delete the task
+        deleted = delete_task_from_file(self.task_file, self.complete_task_file, task_text, self.date_string, self.date_format)
+        if deleted:
+            self.task_listbox.delete(selected_index)
+            # Award exp only if completed on or before due date
+            if not parsed_due or parsed_due >= today:
+                self.gain_exp(10)
+            else:
+                messagebox.showinfo("Task Deleted", "Task was deleted, but no exp awarded because it was past due.")
+        else:
+            messagebox.showwarning("Delete Failed", "Task could not be deleted.")
 
     def dismiss_recurring(self):
         selected_index = self.task_listbox.curselection()
@@ -474,9 +491,15 @@ class TaskKeeperApp:
         display_tasks_in_listbox(self.task_file, self.task_listbox, self.date_format, dismissed_today, displayed_today)
 
     def launch_calendar(self):
-        calendar_path = os.path.join(os.path.dirname(__file__), "CalendarCompanion.py")
-        if self.calendar_process is None or self.calendar_process.poll() is not None:
-            self.calendar_process = subprocess.Popen([sys.executable, calendar_path])
+        # Resolve CalendarCompanion.py path whether running normally or frozen by PyInstaller
+        base = getattr(sys, "_MEIPASS", os.path.dirname(__file__))
+        calendar_path = os.path.join(base, "CalendarCompanion.py")
+        # Use python interpreter to run the calendar script
+        if os.path.exists(calendar_path):
+            subprocess.Popen([sys.executable, calendar_path])
+        else:
+            # fallback: try to import/run as module
+            subprocess.Popen([sys.executable, os.path.join(os.path.dirname(__file__), "CalendarCompanion.py")])
 
     def on_close(self):
         # Close calendar if open
