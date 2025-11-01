@@ -18,8 +18,6 @@ import os
 from datetime import date, datetime, timedelta
 import json
 from themes.color_manager import open_color_editor, save_theme
-import sys
-import subprocess
 
 
 
@@ -491,15 +489,9 @@ class TaskKeeperApp:
         display_tasks_in_listbox(self.task_file, self.task_listbox, self.date_format, dismissed_today, displayed_today)
 
     def launch_calendar(self):
-        # Resolve CalendarCompanion.py path whether running normally or frozen by PyInstaller
-        base = getattr(sys, "_MEIPASS", os.path.dirname(__file__))
-        calendar_path = os.path.join(base, "CalendarCompanion.py")
-        # Use python interpreter to run the calendar script
-        if os.path.exists(calendar_path):
-            subprocess.Popen([sys.executable, calendar_path])
-        else:
-            # fallback: try to import/run as module
-            subprocess.Popen([sys.executable, os.path.join(os.path.dirname(__file__), "CalendarCompanion.py")])
+        calendar_path = os.path.join(os.path.dirname(__file__), "CalendarCompanion.py")
+        if self.calendar_process is None or self.calendar_process.poll() is not None:
+            self.calendar_process = subprocess.Popen([sys.executable, calendar_path])
 
     def on_close(self):
         # Close calendar if open
