@@ -18,7 +18,8 @@ import os
 from datetime import date, datetime, timedelta
 import json
 from themes.color_manager import open_color_editor, save_theme
-
+import subprocess
+import sys
 
 
 class TaskKeeperApp:
@@ -267,7 +268,7 @@ class TaskKeeperApp:
         display_text = self.task_listbox.get(selected_index)
         task_text = self.extract_task_text(display_text)
 
-        # Find the task and its due date
+        # Before deleting:
         task_due_date = None
         try:
             with open(self.task_file, "r") as f:
@@ -279,32 +280,16 @@ class TaskKeeperApp:
         except Exception:
             pass
 
-        today = date.today()
-        parsed_due = None
         if task_due_date:
-            for fmt in ("%Y-%m-%d", "%m-%d-%Y", "%d-%m-%Y"):
-                try:
-                    parsed_due = datetime.strptime(task_due_date, fmt).date()
-                    break
-                except Exception:
-                    continue
+            today = date.today()
+            parsed_due = parse_date(task_due_date, self.date_format)
+            if not parsed_due or parsed_due.date() != today:
+                messagebox.showinfo("Not Due Yet", "This task can't be completed until its due date.")
+                return
 
-        # Only allow deletion if due date is today or in the past
-        if parsed_due and parsed_due > today:
-            messagebox.showinfo("Not Due Yet", "This task can't be completed until its due date.")
-            return
-
-        # Actually delete the task
-        deleted = delete_task_from_file(self.task_file, self.complete_task_file, task_text, self.date_string, self.date_format)
-        if deleted:
-            self.task_listbox.delete(selected_index)
-            # Award exp only if completed on or before due date
-            if not parsed_due or parsed_due >= today:
-                self.gain_exp(10)
-            else:
-                messagebox.showinfo("Task Deleted", "Task was deleted, but no exp awarded because it was past due.")
-        else:
-            messagebox.showwarning("Delete Failed", "Task could not be deleted.")
+        delete_task_from_file(self.task_file, self.complete_task_file, task_text, self.date_string, self.date_format)
+        self.task_listbox.delete(selected_index)
+        self.gain_exp(10)
 
     def dismiss_recurring(self):
         selected_index = self.task_listbox.curselection()
